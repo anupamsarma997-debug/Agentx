@@ -69,6 +69,7 @@ fun MetaConnectionScreen(
     modifier: Modifier = Modifier
 ) {
     val connectionState by viewModel.metaConnection.collectAsState()
+    val configDialogMessage by viewModel.metaConfigDialogMessage.collectAsState()
     val scrollState = rememberScrollState()
 
     var showDisconnectDialog by remember { mutableStateOf(false) }
@@ -110,18 +111,54 @@ fun MetaConnectionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // DEMO / SANDBOX Warning Banner (prominently shown when in simulation)
+            if (connectionState.isDemoSandbox) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("sandbox_mode_banner"),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF3C7)),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFD97706)
+                        ) {
+                            Text(
+                                text = "DEMO / SANDBOX",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Simulated connection for testing. This is not a real Meta connection and cannot publish to live Facebook/Instagram servers.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF92400E)
+                        )
+                    }
+                }
+            }
+
             // Overall Connection Status Card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("meta_status_banner_card"),
                 colors = CardDefaults.cardColors(
-                    containerColor = when (connectionState.status) {
-                        MetaConnectionStatus.CONNECTED -> Color(0xFFDCFCE7)
-                        MetaConnectionStatus.PERMISSION_REQUIRED -> Color(0xFFFEF3C7)
-                        MetaConnectionStatus.CONFIGURATION_REQUIRED -> Color(0xFFEFF6FF)
-                        MetaConnectionStatus.EXPIRED, MetaConnectionStatus.ERROR -> Color(0xFFFEE2E2)
-                        MetaConnectionStatus.DISCONNECTED -> MaterialTheme.colorScheme.surfaceContainerHigh
+                    containerColor = when {
+                        connectionState.isDemoSandbox -> Color(0xFFFEF3C7)
+                        connectionState.status == MetaConnectionStatus.CONNECTED -> Color(0xFFDCFCE7)
+                        connectionState.status == MetaConnectionStatus.PERMISSION_REQUIRED -> Color(0xFFFEF3C7)
+                        connectionState.status == MetaConnectionStatus.CONFIGURATION_REQUIRED -> Color(0xFFEFF6FF)
+                        connectionState.status == MetaConnectionStatus.EXPIRED || connectionState.status == MetaConnectionStatus.ERROR -> Color(0xFFFEE2E2)
+                        else -> MaterialTheme.colorScheme.surfaceContainerHigh
                     }
                 ),
                 shape = RoundedCornerShape(16.dp)
@@ -130,12 +167,13 @@ fun MetaConnectionScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val (icon, tint) = when (connectionState.status) {
-                        MetaConnectionStatus.CONNECTED -> Icons.Default.CheckCircle to Color(0xFF166534)
-                        MetaConnectionStatus.PERMISSION_REQUIRED -> Icons.Default.Warning to Color(0xFF92400E)
-                        MetaConnectionStatus.CONFIGURATION_REQUIRED -> Icons.Default.Info to Color(0xFF1E40AF)
-                        MetaConnectionStatus.EXPIRED, MetaConnectionStatus.ERROR -> Icons.Default.ErrorOutline to Color(0xFF991B1B)
-                        MetaConnectionStatus.DISCONNECTED -> Icons.Default.LinkOff to MaterialTheme.colorScheme.onSurfaceVariant
+                    val (icon, tint) = when {
+                        connectionState.isDemoSandbox -> Icons.Default.Info to Color(0xFFB45309)
+                        connectionState.status == MetaConnectionStatus.CONNECTED -> Icons.Default.CheckCircle to Color(0xFF166534)
+                        connectionState.status == MetaConnectionStatus.PERMISSION_REQUIRED -> Icons.Default.Warning to Color(0xFF92400E)
+                        connectionState.status == MetaConnectionStatus.CONFIGURATION_REQUIRED -> Icons.Default.Info to Color(0xFF1E40AF)
+                        connectionState.status == MetaConnectionStatus.EXPIRED || connectionState.status == MetaConnectionStatus.ERROR -> Icons.Default.ErrorOutline to Color(0xFF991B1B)
+                        else -> Icons.Default.LinkOff to MaterialTheme.colorScheme.onSurfaceVariant
                     }
 
                     Icon(
@@ -147,7 +185,11 @@ fun MetaConnectionScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "Connection Status: ${formatStatus(connectionState.status)}",
+                            text = if (connectionState.isDemoSandbox) {
+                                "Connection Status: DEMO / SANDBOX"
+                            } else {
+                                "Connection Status: ${formatStatus(connectionState.status)}"
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = tint
@@ -227,10 +269,27 @@ fun MetaConnectionScreen(
                             )
                         }
 
-                        StatusChip(
-                            isConnected = connectionState.isFacebookConnected,
-                            label = if (connectionState.isFacebookConnected) "Connected" else "Not connected"
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (connectionState.isDemoSandbox && connectionState.isFacebookConnected) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFFEF3C7),
+                                    modifier = Modifier.padding(end = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "DEMO / SANDBOX",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFB45309),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            StatusChip(
+                                isConnected = connectionState.isFacebookConnected,
+                                label = if (connectionState.isFacebookConnected) "Connected" else "Not connected"
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -257,6 +316,35 @@ fun MetaConnectionScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.disconnectFacebook() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_disconnect_facebook"),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("Disconnect")
+                            }
+                            OutlinedButton(
+                                onClick = { viewModel.reconnectFacebook() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_reconnect_facebook"),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Reconnect")
+                            }
+                        }
                     } else {
                         Text(
                             text = "Connect the Facebook Page that administers your social channels.",
@@ -265,7 +353,7 @@ fun MetaConnectionScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(
-                            onClick = { viewModel.connectMetaAccount() },
+                            onClick = { viewModel.connectFacebookPage() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("btn_connect_facebook"),
@@ -311,10 +399,27 @@ fun MetaConnectionScreen(
                             )
                         }
 
-                        StatusChip(
-                            isConnected = connectionState.isInstagramConnected,
-                            label = if (connectionState.isInstagramConnected) "Connected" else "Not connected"
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (connectionState.isDemoSandbox && connectionState.isInstagramConnected) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFFEF3C7),
+                                    modifier = Modifier.padding(end = 6.dp)
+                                ) {
+                                    Text(
+                                        text = "DEMO / SANDBOX",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFB45309),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            StatusChip(
+                                isConnected = connectionState.isInstagramConnected,
+                                label = if (connectionState.isInstagramConnected) "Connected" else "Not connected"
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -346,6 +451,35 @@ fun MetaConnectionScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.disconnectInstagram() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_disconnect_instagram"),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("Disconnect")
+                            }
+                            OutlinedButton(
+                                onClick = { viewModel.reconnectInstagram() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("btn_reconnect_instagram"),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Reconnect")
+                            }
+                        }
                     } else {
                         Text(
                             text = "Link the Instagram Professional account associated with your Facebook Page.",
@@ -354,7 +488,7 @@ fun MetaConnectionScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(
-                            onClick = { viewModel.connectMetaAccount() },
+                            onClick = { viewModel.connectInstagram() },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("btn_connect_instagram"),
@@ -366,24 +500,6 @@ fun MetaConnectionScreen(
                             Text("Connect Instagram")
                         }
                     }
-                }
-            }
-
-            // Disconnect Button (active if any account is connected)
-            if (connectionState.facebookPage != null || connectionState.instagramAccount != null) {
-                OutlinedButton(
-                    onClick = { showDisconnectDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("btn_disconnect_meta"),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Default.LinkOff, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Disconnect Meta Accounts")
                 }
             }
 
@@ -413,7 +529,7 @@ fun MetaConnectionScreen(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Test connection states (Professional vs Personal, connected vs disconnected) safely without exposing credentials.",
+                        text = "Test connection states safely. Simulated sandbox connections are clearly marked as DEMO / SANDBOX and never mixed with real credentials.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -427,6 +543,40 @@ fun MetaConnectionScreen(
                 }
             }
         }
+    }
+
+    // Meta Developer Configuration Required Dialog
+    if (configDialogMessage != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissMetaConfigDialog() },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Meta Configuration",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = configDialogMessage ?: "",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissMetaConfigDialog() }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     // Disconnect Confirmation Dialog
@@ -460,10 +610,10 @@ fun MetaConnectionScreen(
     if (showPreviewMockDialog) {
         AlertDialog(
             onDismissRequest = { showPreviewMockDialog = false },
-            title = { Text("Simulate Connection State") },
+            title = { Text("Simulate Connection State (Sandbox)") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Select a state scenario to verify UI & model compliance:")
+                    Text("Select a sandbox scenario to verify UI & model compliance (explicitly marked as DEMO / SANDBOX):")
                     Button(
                         onClick = {
                             viewModel.setVerifiedMetaPreview(
@@ -476,7 +626,7 @@ fun MetaConnectionScreen(
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Eligible Professional Account (Success)")
+                        Text("Eligible Professional Account (DEMO / SANDBOX)")
                     }
                     Button(
                         onClick = {
@@ -491,7 +641,7 @@ fun MetaConnectionScreen(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
                     ) {
-                        Text("Personal Account (Expected Rejection)")
+                        Text("Personal Account - Ineligible (DEMO / SANDBOX)")
                     }
                 }
             },

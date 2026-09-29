@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -6,6 +7,28 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
+}
+
+// Configure environment variables and .env file
+val envFile = rootProject.file(".env")
+val envProps = Properties()
+if (envFile.exists()) {
+  try {
+    envFile.inputStream().use { envProps.load(it) }
+  } catch (_: Exception) {}
+}
+var envChanged = false
+listOf("GEMINI_API_KEY", "META_APP_ID", "META_REDIRECT_URI").forEach { key ->
+  val envVal = System.getenv(key)
+  if (!envVal.isNullOrBlank() && (envProps.getProperty(key).isNullOrBlank() || envProps.getProperty(key).startsWith("MY_") || envProps.getProperty(key).startsWith("YOUR_"))) {
+    envProps.setProperty(key, envVal.trim())
+    envChanged = true
+  }
+}
+if (envChanged || !envFile.exists()) {
+  try {
+    envFile.outputStream().use { envProps.store(it, "Generated from AI Studio Secrets environment") }
+  } catch (_: Exception) {}
 }
 
 android {
@@ -20,6 +43,15 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    val geminiKey = (envProps.getProperty("GEMINI_API_KEY") ?: System.getenv("GEMINI_API_KEY") ?: "").trim()
+    buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+
+    val metaAppId = (envProps.getProperty("META_APP_ID") ?: System.getenv("META_APP_ID") ?: "").trim()
+    buildConfigField("String", "META_APP_ID", "\"$metaAppId\"")
+
+    val metaRedirectUri = (envProps.getProperty("META_REDIRECT_URI") ?: System.getenv("META_REDIRECT_URI") ?: "socialagent://meta-callback").trim()
+    buildConfigField("String", "META_REDIRECT_URI", "\"$metaRedirectUri\"")
   }
 
   signingConfigs {
@@ -62,12 +94,14 @@ android {
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
+  ignoreList.add("META_APP_SECRET")
+  ignoreList.add("META_APP_ID")
+  ignoreList.add("GEMINI_API_KEY")
+  ignoreList.add("META_REDIRECT_URI")
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }

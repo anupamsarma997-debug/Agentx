@@ -54,7 +54,10 @@ data class MetaConnectionState(
     val facebookPage: FacebookPageInfo? = null,
     val instagramAccount: InstagramAccountInfo? = null,
     val errorMessage: String? = null,
-    val lastConnectedTimestamp: Long? = null
+    val lastConnectedTimestamp: Long? = null,
+    val isDemoSandbox: Boolean = false,
+    val availablePages: List<FacebookPageInfo> = emptyList(),
+    val isAuthenticating: Boolean = false
 ) {
     val isFacebookConnected: Boolean
         get() = status == MetaConnectionStatus.CONNECTED && facebookPage?.isConnected == true

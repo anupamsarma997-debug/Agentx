@@ -25,6 +25,8 @@ import com.example.data.model.opportunity.VerificationStatus
 import com.example.data.remote.ai.GeminiClient
 import com.example.data.remote.meta.MetaOAuthConfig
 import com.example.data.remote.meta.MetaOAuthClient
+import com.example.data.remote.meta.MetaOAuthResult
+import com.example.data.remote.meta.OAuthCallbackOutcome
 import com.example.data.remote.scout.OfficialCuratedSourceProvider
 import com.example.data.repository.ContentRepository
 import com.example.data.repository.MetaConnectionRepository
@@ -244,12 +246,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
+    private val _metaConfigDialogMessage = MutableStateFlow<String?>(null)
+    val metaConfigDialogMessage: StateFlow<String?> = _metaConfigDialogMessage.asStateFlow()
+
     fun showMessage(message: String) {
         _userMessage.value = message
     }
 
     fun clearMessage() {
         _userMessage.value = null
+    }
+
+    fun dismissMetaConfigDialog() {
+        _metaConfigDialogMessage.value = null
+    }
+
+    fun showMetaConfigDialog(message: String) {
+        _metaConfigDialogMessage.value = message
     }
 
     fun triggerScoutScan() {
@@ -638,18 +651,138 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun connectMetaAccount() {
+    fun connectFacebookPage(onLaunchIntent: (android.net.Uri) -> Unit = {}) {
         val check = metaOAuthClient.checkConfigurationStatus()
-        if (check != null) {
-            metaConnectionRepository.setError(
-                "Meta App configuration is required. Please register an App ID on developers.facebook.com and configure META_APP_ID."
-            )
+        if (check is MetaOAuthResult.ConfigurationRequired) {
+            metaConnectionRepository.setError(check.message)
+            _metaConfigDialogMessage.value = check.message
             showMessage("Meta Developer Configuration Required")
         } else {
-            // Build authorization URI when configured
             val uri = metaOAuthClient.buildAuthorizationUri()
             if (uri != null) {
                 showMessage("Redirecting to Meta OAuth...")
+                onLaunchIntent(uri)
+            } else {
+                metaConnectionRepository.setError("Unable to build Meta authorization URL.")
+            }
+        }
+    }
+
+    fun connectMetaAccount() {
+        connectFacebookPage()
+    }
+
+    fun connectInstagram() {
+        val conn = metaConnection.value
+        if (!conn.isFacebookConnected) {
+            _metaConfigDialogMessage.value = "Connect your Facebook Page first.\n\nMeta requires an eligible Instagram Professional (Business or Creator) account to be associated with an administered Facebook Page to publish content."
+            showMessage("Connect your Facebook Page first.")
+            return
+        }
+
+        val fbPage = conn.facebookPage ?: return
+        val pageToken = metaOAuthClient.getPageToken(fbPage.pageId)
+
+        if (pageToken.isNullOrBlank()) {
+            metaConnectionRepository.setExpired()
+            _metaConfigDialogMessage.value = "Facebook Page session token has expired or is missing. Please reconnect your Facebook Page."
+            showMessage("Facebook session expired. Reconnect Facebook Page.")
+            return
+        }
+
+        viewModelScope.launch {
+            metaConnectionRepository.setAuthenticating(true)
+            val igResult = metaOAuthClient.fetchInstagramForPage(fbPage.pageId, pageToken)
+            metaConnectionRepository.setAuthenticating(false)
+
+            igResult.fold(
+                onSuccess = { ig ->
+                    if (ig != null) {
+                        metaConnectionRepository.saveConnection(
+                            facebookPage = fbPage,
+                            instagramAccount = ig,
+                            pageToken = pageToken,
+                            isDemoSandbox = conn.isDemoSandbox
+                        )
+                        showMessage("Instagram Professional (@${ig.username}) connected!")
+                    } else {
+                        metaConnectionRepository.setError(
+                            "No eligible Instagram Professional account found for Page '${fbPage.pageName}'."
+                        )
+                        _metaConfigDialogMessage.value = "No eligible Instagram Professional account was detected for Facebook Page '${fbPage.pageName}'.\n\nEnsure that:\n1. Your Instagram account is switched to Professional (Business or Creator) in Instagram app settings.\n2. The Instagram account is linked to '${fbPage.pageName}' in Meta Business Suite."
+                    }
+                },
+                onFailure = { err ->
+                    metaConnectionRepository.setError(err.localizedMessage ?: "Failed to connect Instagram")
+                    _metaConfigDialogMessage.value = "Instagram connection error: ${err.localizedMessage ?: "Unknown error"}"
+                }
+            )
+        }
+    }
+
+    fun disconnectFacebook() {
+        metaConnectionRepository.disconnectFacebook()
+        showMessage("Facebook Page disconnected.")
+    }
+
+    fun disconnectInstagram() {
+        metaConnectionRepository.disconnectInstagram()
+        showMessage("Instagram disconnected.")
+    }
+
+    fun reconnectFacebook(onLaunchIntent: (android.net.Uri) -> Unit = {}) {
+        disconnectFacebook()
+        connectFacebookPage(onLaunchIntent)
+    }
+
+    fun reconnectInstagram() {
+        disconnectInstagram()
+        connectInstagram()
+    }
+
+    fun refreshMetaConnection() {
+        val conn = metaConnection.value
+        if (!conn.isFacebookConnected) {
+            showMessage("No accounts connected to refresh.")
+            return
+        }
+        val fb = conn.facebookPage ?: return
+        val pageToken = metaOAuthClient.getPageToken(fb.pageId)
+        if (pageToken.isNullOrBlank()) {
+            metaConnectionRepository.setExpired()
+            showMessage("Session expired. Please reconnect.")
+            return
+        }
+
+        viewModelScope.launch {
+            val igResult = metaOAuthClient.fetchInstagramForPage(fb.pageId, pageToken)
+            igResult.onSuccess { ig ->
+                metaConnectionRepository.saveConnection(
+                    facebookPage = fb,
+                    instagramAccount = ig ?: conn.instagramAccount,
+                    pageToken = pageToken,
+                    isDemoSandbox = conn.isDemoSandbox
+                )
+                showMessage("Meta connection verified and refreshed.")
+            }.onFailure { err ->
+                metaConnectionRepository.setError("Refresh failed: ${err.localizedMessage ?: "API Error"}")
+            }
+        }
+    }
+
+    fun handleOAuthCallback(uri: android.net.Uri) {
+        val outcome = metaOAuthClient.parseCallbackUri(uri)
+        when (outcome) {
+            is OAuthCallbackOutcome.PermissionDenied -> {
+                metaConnectionRepository.setPermissionDenied()
+                showMessage("Meta authorization was denied.")
+            }
+            is OAuthCallbackOutcome.Error -> {
+                metaConnectionRepository.setError(outcome.message)
+                showMessage(outcome.message)
+            }
+            is OAuthCallbackOutcome.CodeReceived -> {
+                showMessage("Meta authorization received.")
             }
         }
     }
@@ -661,6 +794,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /**
      * Connects verified test/preview credentials for architectural validation.
+     * Explicitly marked with isDemoSandbox = true so it is NEVER confused with real Meta connections.
      */
     fun setVerifiedMetaPreview(
         pageName: String,
@@ -674,8 +808,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             username = instagramUsername,
             accountType = instagramType
         )
-        metaConnectionRepository.saveConnection(page, ig, pageToken = "dev_ref_${pageId}")
-        showMessage("Meta accounts linked: $pageName & @$instagramUsername")
+        metaConnectionRepository.saveConnection(
+            facebookPage = page,
+            instagramAccount = ig,
+            pageToken = "dev_ref_${pageId}",
+            isDemoSandbox = true
+        )
+        showMessage("DEMO / SANDBOX: $pageName & @$instagramUsername")
     }
 
     fun setFreeMode(enabled: Boolean) {

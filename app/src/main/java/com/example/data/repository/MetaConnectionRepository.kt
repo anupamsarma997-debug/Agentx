@@ -36,7 +36,8 @@ class MetaConnectionRepository(
     fun saveConnection(
         facebookPage: FacebookPageInfo,
         instagramAccount: InstagramAccountInfo?,
-        pageToken: String? = null
+        pageToken: String? = null,
+        isDemoSandbox: Boolean = false
     ) {
         if (pageToken != null && pageToken.isNotBlank()) {
             oauthClient.storePageTokenSafely(facebookPage.pageId, pageToken)
@@ -49,7 +50,8 @@ class MetaConnectionRepository(
                 facebookPage = facebookPage.copy(hasAccessTokenRef = pageToken != null),
                 instagramAccount = instagramAccount,
                 errorMessage = "Instagram Personal account (@${instagramAccount.username}) is not eligible for publishing. Please switch to a Professional (Business or Creator) account in Instagram settings.",
-                lastConnectedTimestamp = System.currentTimeMillis()
+                lastConnectedTimestamp = System.currentTimeMillis(),
+                isDemoSandbox = isDemoSandbox
             )
             return
         }
@@ -61,7 +63,39 @@ class MetaConnectionRepository(
             facebookPage = facebookPage.copy(hasAccessTokenRef = hasToken),
             instagramAccount = instagramAccount,
             errorMessage = null,
-            lastConnectedTimestamp = System.currentTimeMillis()
+            lastConnectedTimestamp = System.currentTimeMillis(),
+            isDemoSandbox = isDemoSandbox
+        )
+    }
+
+    fun disconnectFacebook() {
+        oauthClient.clearTokens()
+        _connectionState.value = MetaConnectionState(
+            status = MetaConnectionStatus.DISCONNECTED,
+            facebookPage = null,
+            instagramAccount = null,
+            errorMessage = null,
+            lastConnectedTimestamp = null,
+            isDemoSandbox = false
+        )
+    }
+
+    fun disconnectInstagram() {
+        val currentFb = _connectionState.value.facebookPage
+        _connectionState.value = _connectionState.value.copy(
+            instagramAccount = null
+        )
+    }
+
+    fun setAvailablePages(pages: List<FacebookPageInfo>) {
+        _connectionState.value = _connectionState.value.copy(
+            availablePages = pages
+        )
+    }
+
+    fun setAuthenticating(authenticating: Boolean) {
+        _connectionState.value = _connectionState.value.copy(
+            isAuthenticating = authenticating
         )
     }
 
