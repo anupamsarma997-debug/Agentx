@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Megaphone body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,46 L46,46 L62,34 L62,74 L46,62 L34,62 Z" />
+    <!-- Handle -->
+    <path
+        android:fillColor="#E0E7FF"
+        android:pathData="M44,62 L44,72 C44,74.2 42.2,76 40,76 C37.8,76 36,74.2 36,72 L36,62 Z" />
+    <!-- AI Spark / Flash Accent -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M70,38 C73,42 75,48 75,54 C75,60 73,66 70,70 L73,73 C77,68 80,61 80,54 C80,47 77,40 73,35 Z" />
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M78,30 C83,36 86,44 86,54 C86,64 83,72 78,78 L81,81 C87,74 91,65 91,54 C91,43 87,34 81,27 Z" />
+    <!-- Center energy spark -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M52,50 L56,42 L53,52 L57,52 L50,64 L52,55 L48,55 Z" />
+</vector>

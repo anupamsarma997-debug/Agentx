@@ -1,0 +1,6 @@
+{
+  "name": "SocialAgent",
+  "description": "AI Social Opportunity and Viral Content Agent for trend discovery, verification, and multi-format content generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

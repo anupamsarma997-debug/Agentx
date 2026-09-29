@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MyApplication">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MyApplication">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                META OAUTH DEEP LINK CALLBACK FOUNDATION:
+                Scheme: socialagent://meta-callback
+
+                META CONFIGURATION REQUIRED:
+                - Meta App ID (registered at https://developers.facebook.com)
+                - Facebook Login for Business product added to Meta App
+                - Valid redirect/callback configuration matching 'socialagent://meta-callback'
+                - Required permissions: pages_show_list, pages_read_engagement, pages_manage_posts, instagram_basic, instagram_content_publish
+                - Valid Facebook Page administered by the authenticated user
+                - Eligible Instagram Professional (Business/Creator) account connected to that Facebook Page
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="meta-callback"
+                    android:scheme="socialagent" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
