@@ -19,7 +19,12 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class MetaConnectionTest {
 
     private lateinit var tokenStore: InMemorySecureTokenStore
@@ -196,5 +201,61 @@ class MetaConnectionTest {
         assertTrue(fbResult is PublishResult.Disabled)
         assertTrue(igResult is PublishResult.Disabled)
         assertTrue(reelResult is PublishResult.Disabled)
+    }
+
+    // 10. CSRF state generation and validation
+    @Test
+    fun `test 10 - csrf state protection validates matching nonce and rejects tampering`() {
+        val uri = oauthClient.buildAuthorizationUri()
+        assertNotNull(uri)
+        val generatedState = uri!!.getQueryParameter("state")
+        assertNotNull(generatedState)
+        assertTrue(generatedState!!.startsWith("sa_"))
+
+        // Tampered state -> Error outcome
+        val tamperedCallback = android.net.Uri.parse("socialagent://meta-callback?code=valid_code&state=fake_state")
+        val outcomeTampered = oauthClient.parseCallbackUri(tamperedCallback)
+        assertTrue("Tampered state must fail CSRF validation", outcomeTampered is com.example.data.remote.meta.OAuthCallbackOutcome.Error)
+        assertTrue((outcomeTampered as com.example.data.remote.meta.OAuthCallbackOutcome.Error).message.contains("CSRF"))
+
+        // Re-generate and test valid matching state
+        val uri2 = oauthClient.buildAuthorizationUri()
+        val validState = uri2!!.getQueryParameter("state")
+        val validCallback = android.net.Uri.parse("socialagent://meta-callback?code=valid_code_123&state=$validState")
+        val outcomeValid = oauthClient.parseCallbackUri(validCallback)
+        assertTrue("Matching state must succeed", outcomeValid is com.example.data.remote.meta.OAuthCallbackOutcome.CodeReceived)
+        assertEquals("valid_code_123", (outcomeValid as com.example.data.remote.meta.OAuthCallbackOutcome.CodeReceived).code)
+    }
+
+    // 11. User cancellation handling
+    @Test
+    fun `test 11 - user cancellation in OAuth flow returns UserCancelled`() {
+        val cancelUri = android.net.Uri.parse("socialagent://meta-callback?error=access_denied&error_reason=user_denied")
+        val outcome = oauthClient.parseCallbackUri(cancelUri)
+        assertTrue("User denial must produce UserCancelled outcome", outcome is com.example.data.remote.meta.OAuthCallbackOutcome.UserCancelled)
+    }
+
+    // 12. Security guard: Client-side secret code exchange is refused
+    @Test
+    fun `test 12 - client-side secret code exchange is refused securely without backend`() = runTest {
+        val result = oauthClient.exchangeCodeForAccessToken("test_auth_code")
+        assertTrue("Code exchange without secure server must fail", result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("Meta App Secret cannot be safely shipped"))
+    }
+
+    // 13. Lifecycle connection transitions
+    @Test
+    fun `test 13 - connection lifecycle transitions through opening, waiting, and connecting states`() {
+        repository.setOpeningMeta()
+        assertEquals(MetaConnectionStatus.OPENING_META, repository.connectionState.value.status)
+        assertTrue(repository.connectionState.value.isAuthenticating)
+
+        repository.setWaitingForAuthorization()
+        assertEquals(MetaConnectionStatus.WAITING_FOR_AUTHORIZATION, repository.connectionState.value.status)
+        assertTrue(repository.connectionState.value.isAuthenticating)
+
+        repository.setConnecting()
+        assertEquals(MetaConnectionStatus.CONNECTING, repository.connectionState.value.status)
+        assertTrue(repository.connectionState.value.isAuthenticating)
     }
 }

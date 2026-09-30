@@ -660,8 +660,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             val uri = metaOAuthClient.buildAuthorizationUri()
             if (uri != null) {
-                showMessage("Redirecting to Meta OAuth...")
-                onLaunchIntent(uri)
+                metaConnectionRepository.setOpeningMeta()
+                showMessage("Opening Meta OAuth...")
+                try {
+                    onLaunchIntent(uri)
+                    metaConnectionRepository.setWaitingForAuthorization()
+                } catch (e: Exception) {
+                    metaConnectionRepository.setError("Failed to launch browser: ${e.localizedMessage}")
+                    showMessage("Failed to open browser.")
+                }
             } else {
                 metaConnectionRepository.setError("Unable to build Meta authorization URL.")
             }
@@ -773,17 +780,66 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun handleOAuthCallback(uri: android.net.Uri) {
         val outcome = metaOAuthClient.parseCallbackUri(uri)
         when (outcome) {
+            is OAuthCallbackOutcome.UserCancelled -> {
+                metaConnectionRepository.disconnect()
+                showMessage("Meta authorization was cancelled.")
+            }
             is OAuthCallbackOutcome.PermissionDenied -> {
                 metaConnectionRepository.setPermissionDenied()
-                showMessage("Meta authorization was denied.")
+                showMessage("Meta authorization was denied by user.")
             }
             is OAuthCallbackOutcome.Error -> {
                 metaConnectionRepository.setError(outcome.message)
                 showMessage(outcome.message)
             }
             is OAuthCallbackOutcome.CodeReceived -> {
-                showMessage("Meta authorization received.")
+                val code = outcome.code
+                val maskedCode = if (code.length > 8) "${code.take(4)}...${code.takeLast(4)}" else "***"
+                metaConnectionRepository.setError("Authorization code received ($maskedCode). Server-side token exchange required.")
+                _metaConfigDialogMessage.value = "Meta Authorization Code Received!\n\n" +
+                    "Code: $maskedCode\n\n" +
+                    "SECURITY REQUIREMENT:\n" +
+                    "In compliance with Meta Platform Terms and Android OAuth security standards, Meta App Secrets cannot be bundled inside an Android client APK. Exchanging this authorization code for an access token requires a secure backend server.\n\n" +
+                    "HOW TO CONNECT RIGHT NOW:\n" +
+                    "Please tap 'Connect with Page Access Token' below. You can obtain a Page Access Token directly from Meta Business Suite or the Meta Graph API Explorer (developers.facebook.com/tools/explorer)."
+                showMessage("Code received. Server-side token exchange required.")
             }
+        }
+    }
+
+    fun connectWithDirectPageToken(token: String, onComplete: (Boolean) -> Unit = {}) {
+        val cleanToken = token.trim()
+        if (cleanToken.isBlank()) {
+            showMessage("Please enter a valid Page Access Token.")
+            return
+        }
+        viewModelScope.launch {
+            metaConnectionRepository.setConnecting()
+            val result = metaOAuthClient.connectWithPageAccessToken(cleanToken)
+            result.fold(
+                onSuccess = { (fbPage, igAccount) ->
+                    metaConnectionRepository.saveConnection(
+                        facebookPage = fbPage,
+                        instagramAccount = igAccount,
+                        pageToken = cleanToken,
+                        isDemoSandbox = false
+                    )
+                    val igMsg = if (igAccount != null) " & Instagram: @${igAccount.username}" else " (No Instagram linked)"
+                    showMessage("Connected Facebook Page: ${fbPage.pageName}$igMsg")
+                    onComplete(true)
+                },
+                onFailure = { err ->
+                    val errMsg = err.localizedMessage ?: "Token validation failed"
+                    if (errMsg.contains("190") || errMsg.contains("expired", ignoreCase = true)) {
+                        metaConnectionRepository.setExpired()
+                    } else {
+                        metaConnectionRepository.setError(errMsg)
+                    }
+                    _metaConfigDialogMessage.value = "Failed to connect Facebook Page:\n\n$errMsg\n\nChecklist:\n1. Verify the token is valid and not expired.\n2. Ensure the token has permissions: pages_show_list, pages_read_engagement, pages_manage_posts.\n3. Make sure the user is an admin of the Facebook Page."
+                    showMessage("Connection failed: ${err.message}")
+                    onComplete(false)
+                }
+            )
         }
     }
 

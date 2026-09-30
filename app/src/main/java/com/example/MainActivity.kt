@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIncomingOAuthIntent(intent)
     }
 
@@ -109,8 +110,10 @@ fun SocialAgentApp(
                         },
                         label = {
                             Text(
-                                text = screen.title,
-                                style = MaterialTheme.typography.labelSmall
+                                text = screen.navLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         },
                         modifier = Modifier.testTag("nav_item_${screen.route}")

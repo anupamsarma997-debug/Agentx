@@ -17,7 +17,8 @@ sealed class Screen(
     val route: String,
     val title: String,
     val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
+    val unselectedIcon: ImageVector,
+    val navLabel: String = title
 ) {
     data object Dashboard : Screen(
         route = "dashboard",
@@ -30,7 +31,8 @@ sealed class Screen(
         route = "opportunities",
         title = "Opportunities",
         selectedIcon = Icons.AutoMirrored.Filled.TrendingUp,
-        unselectedIcon = Icons.AutoMirrored.Outlined.TrendingUp
+        unselectedIcon = Icons.AutoMirrored.Outlined.TrendingUp,
+        navLabel = "Trends"
     )
 
     data object ContentQueue : Screen(

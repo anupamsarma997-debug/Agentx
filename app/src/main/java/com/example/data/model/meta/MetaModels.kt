@@ -2,6 +2,9 @@ package com.example.data.model.meta
 
 enum class MetaConnectionStatus {
     DISCONNECTED,
+    OPENING_META,
+    WAITING_FOR_AUTHORIZATION,
+    CONNECTING,
     CONNECTED,
     PERMISSION_REQUIRED,
     CONFIGURATION_REQUIRED,

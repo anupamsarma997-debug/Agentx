@@ -1,5 +1,6 @@
 package com.example.ui.screens.settings
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Lock
@@ -32,12 +34,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,12 +73,26 @@ fun MetaConnectionScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val connectionState by viewModel.metaConnection.collectAsState()
     val configDialogMessage by viewModel.metaConfigDialogMessage.collectAsState()
     val scrollState = rememberScrollState()
 
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showPreviewMockDialog by remember { mutableStateOf(false) }
+    var showTokenDialog by remember { mutableStateOf(false) }
+    var directTokenInput by remember { mutableStateOf("") }
+
+    val launchMetaOAuth: (android.net.Uri) -> Unit = { authUri ->
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, authUri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            viewModel.showMessage("Could not open browser: ${e.localizedMessage}")
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -111,6 +130,41 @@ fun MetaConnectionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Authenticating Progress Card
+            if (connectionState.isAuthenticating) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("meta_authenticating_card"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Authenticating with Meta...",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Connecting your Facebook Page and Instagram accounts.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            }
             // DEMO / SANDBOX Warning Banner (prominently shown when in simulation)
             if (connectionState.isDemoSandbox) {
                 Card(
@@ -155,6 +209,9 @@ fun MetaConnectionScreen(
                     containerColor = when {
                         connectionState.isDemoSandbox -> Color(0xFFFEF3C7)
                         connectionState.status == MetaConnectionStatus.CONNECTED -> Color(0xFFDCFCE7)
+                        connectionState.status == MetaConnectionStatus.OPENING_META ||
+                        connectionState.status == MetaConnectionStatus.WAITING_FOR_AUTHORIZATION ||
+                        connectionState.status == MetaConnectionStatus.CONNECTING -> Color(0xFFDBEAFE)
                         connectionState.status == MetaConnectionStatus.PERMISSION_REQUIRED -> Color(0xFFFEF3C7)
                         connectionState.status == MetaConnectionStatus.CONFIGURATION_REQUIRED -> Color(0xFFEFF6FF)
                         connectionState.status == MetaConnectionStatus.EXPIRED || connectionState.status == MetaConnectionStatus.ERROR -> Color(0xFFFEE2E2)
@@ -170,6 +227,9 @@ fun MetaConnectionScreen(
                     val (icon, tint) = when {
                         connectionState.isDemoSandbox -> Icons.Default.Info to Color(0xFFB45309)
                         connectionState.status == MetaConnectionStatus.CONNECTED -> Icons.Default.CheckCircle to Color(0xFF166534)
+                        connectionState.status == MetaConnectionStatus.OPENING_META ||
+                        connectionState.status == MetaConnectionStatus.WAITING_FOR_AUTHORIZATION ||
+                        connectionState.status == MetaConnectionStatus.CONNECTING -> Icons.Default.Info to Color(0xFF1D4ED8)
                         connectionState.status == MetaConnectionStatus.PERMISSION_REQUIRED -> Icons.Default.Warning to Color(0xFF92400E)
                         connectionState.status == MetaConnectionStatus.CONFIGURATION_REQUIRED -> Icons.Default.Info to Color(0xFF1E40AF)
                         connectionState.status == MetaConnectionStatus.EXPIRED || connectionState.status == MetaConnectionStatus.ERROR -> Icons.Default.ErrorOutline to Color(0xFF991B1B)
@@ -200,12 +260,36 @@ fun MetaConnectionScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = tint.copy(alpha = 0.9f)
                             )
-                        } else if (connectionState.status == MetaConnectionStatus.DISCONNECTED) {
-                            Text(
-                                text = "No Meta accounts connected. Connect your Facebook Page & Instagram account below.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        } else when (connectionState.status) {
+                            MetaConnectionStatus.DISCONNECTED -> {
+                                Text(
+                                    text = "No Meta accounts connected. Connect your Facebook Page & Instagram account below.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            MetaConnectionStatus.OPENING_META -> {
+                                Text(
+                                    text = "Launching system browser for Meta login...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tint.copy(alpha = 0.9f)
+                                )
+                            }
+                            MetaConnectionStatus.WAITING_FOR_AUTHORIZATION -> {
+                                Text(
+                                    text = "Waiting for authorization in browser. Return here once finished.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tint.copy(alpha = 0.9f)
+                                )
+                            }
+                            MetaConnectionStatus.CONNECTING -> {
+                                Text(
+                                    text = "Connecting and validating with Meta Graph API...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tint.copy(alpha = 0.9f)
+                                )
+                            }
+                            else -> {}
                         }
                     }
                 }
@@ -336,7 +420,7 @@ fun MetaConnectionScreen(
                                 Text("Disconnect")
                             }
                             OutlinedButton(
-                                onClick = { viewModel.reconnectFacebook() },
+                                onClick = { viewModel.reconnectFacebook(launchMetaOAuth) },
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("btn_reconnect_facebook"),
@@ -353,7 +437,7 @@ fun MetaConnectionScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Button(
-                            onClick = { viewModel.connectFacebookPage() },
+                            onClick = { viewModel.connectFacebookPage(launchMetaOAuth) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("btn_connect_facebook"),
@@ -362,7 +446,21 @@ fun MetaConnectionScreen(
                         ) {
                             Icon(Icons.Default.Link, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Connect Facebook Page")
+                            Text("Connect Facebook Page (OAuth)")
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = { showTokenDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_connect_page_token"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Connect with Page Access Token")
                         }
                     }
                 }
@@ -653,6 +751,69 @@ fun MetaConnectionScreen(
             }
         )
     }
+
+    // Direct Page Access Token Dialog
+    if (showTokenDialog) {
+        AlertDialog(
+            onDismissRequest = { showTokenDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Key,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Connect via Page Token", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Paste a Facebook Page Access Token (from Meta Graph API Explorer or Meta Business Suite):",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = directTokenInput,
+                        onValueChange = { directTokenInput = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("input_page_token"),
+                        placeholder = { Text("EAA...") },
+                        singleLine = false,
+                        maxLines = 4,
+                        label = { Text("Page Access Token") }
+                    )
+                    Text(
+                        "This securely verifies your Facebook Page & linked Instagram account directly with Meta Graph API without requiring redirect URIs.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.connectWithDirectPageToken(directTokenInput) { success ->
+                            if (success) {
+                                showTokenDialog = false
+                                directTokenInput = ""
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag("btn_submit_token")
+                ) {
+                    Text("Verify & Connect")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTokenDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -689,11 +850,14 @@ private fun StatusChip(
 
 private fun formatStatus(status: MetaConnectionStatus): String {
     return when (status) {
-        MetaConnectionStatus.DISCONNECTED -> "Not Connected"
+        MetaConnectionStatus.DISCONNECTED -> "Not connected"
+        MetaConnectionStatus.OPENING_META -> "Opening Meta"
+        MetaConnectionStatus.WAITING_FOR_AUTHORIZATION -> "Waiting for authorization"
+        MetaConnectionStatus.CONNECTING -> "Connecting"
         MetaConnectionStatus.CONNECTED -> "Connected"
         MetaConnectionStatus.PERMISSION_REQUIRED -> "Permission Required"
         MetaConnectionStatus.CONFIGURATION_REQUIRED -> "Configuration Required"
-        MetaConnectionStatus.EXPIRED -> "Connection Expired"
-        MetaConnectionStatus.ERROR -> "Error"
+        MetaConnectionStatus.EXPIRED -> "Token expired/revoked"
+        MetaConnectionStatus.ERROR -> "Failed"
     }
 }

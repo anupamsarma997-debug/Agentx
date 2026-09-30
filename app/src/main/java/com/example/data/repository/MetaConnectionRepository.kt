@@ -99,6 +99,30 @@ class MetaConnectionRepository(
         )
     }
 
+    fun setOpeningMeta() {
+        _connectionState.value = _connectionState.value.copy(
+            status = MetaConnectionStatus.OPENING_META,
+            isAuthenticating = true,
+            errorMessage = null
+        )
+    }
+
+    fun setWaitingForAuthorization() {
+        _connectionState.value = _connectionState.value.copy(
+            status = MetaConnectionStatus.WAITING_FOR_AUTHORIZATION,
+            isAuthenticating = true,
+            errorMessage = null
+        )
+    }
+
+    fun setConnecting() {
+        _connectionState.value = _connectionState.value.copy(
+            status = MetaConnectionStatus.CONNECTING,
+            isAuthenticating = true,
+            errorMessage = null
+        )
+    }
+
     fun setPermissionDenied() {
         _connectionState.value = _connectionState.value.copy(
             status = MetaConnectionStatus.PERMISSION_REQUIRED,
