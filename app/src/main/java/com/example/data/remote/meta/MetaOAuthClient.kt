@@ -26,6 +26,7 @@ import java.net.URL
  *    - instagram_basic
  *    - instagram_content_publish
  * 4. Valid redirect URI matching app manifest intent-filter: socialagent://meta-callback
+ * 5. Backend endpoint for secure token exchange (see docs/BACKEND_INTEGRATION.md)
  */
 data class MetaOAuthConfig(
     val appId: String = resolveAppId(),
@@ -110,29 +111,50 @@ class MetaOAuthClient(
         const val TOKEN_KEY_USER_ACCESS = "meta_user_access_token"
     }
 
+    private val oauthState = MetaOAuthState(tokenStore)
+
     /**
      * Constructs the official Meta OAuth authorization URL.
+     * Includes cryptographically secure state parameter for CSRF prevention.
      * Returns null if Meta App ID is missing.
      */
     fun buildAuthorizationUri(): Uri? {
         if (!config.isConfigured) {
             return null
         }
+        
+        // Generate and store secure state before building URI
+        val state = oauthState.generateAndStoreState()
         val scopeString = config.requiredScopes.joinToString(separator = ",")
+        
         return Uri.parse(OAUTH_DIALOG_URL)
             .buildUpon()
             .appendQueryParameter("client_id", config.appId)
             .appendQueryParameter("redirect_uri", config.redirectUri)
             .appendQueryParameter("scope", scopeString)
             .appendQueryParameter("response_type", "code")
-            .appendQueryParameter("state", generateSecureStateNonce())
+            .appendQueryParameter("state", state)
             .build()
     }
 
     /**
-     * Validates callback parameters from official redirect URI.
+     * Validates and parses the OAuth callback URI from Meta.
+     *
+     * CRITICAL SECURITY:
+     * - Validates deep-link scheme and host
+     * - Extracts authorization code
+     * - Extracts state parameter
+     * - Does NOT validate state here (AppViewModel validates it)
+     *
+     * Returns OAuthCallbackOutcome with code and state for ViewModel to validate.
      */
     fun parseCallbackUri(uri: Uri): OAuthCallbackOutcome {
+        // Validate deep-link scheme and host
+        if (uri.scheme != "socialagent" || uri.host != "meta-callback") {
+            return OAuthCallbackOutcome.Error("Invalid callback URI scheme/host: ${uri.scheme}://${uri.host}")
+        }
+
+        // Check for error parameters from Meta
         val error = uri.getQueryParameter("error")
         val errorReason = uri.getQueryParameter("error_reason")
         val errorCode = uri.getQueryParameter("error_code")
@@ -145,12 +167,16 @@ class MetaOAuthClient(
             }
         }
 
+        // Extract authorization code
         val code = uri.getQueryParameter("code")
-        return if (!code.isNullOrBlank()) {
-            OAuthCallbackOutcome.CodeReceived(code)
-        } else {
-            OAuthCallbackOutcome.Error("No authorization code received in callback.")
+        if (code.isNullOrBlank()) {
+            return OAuthCallbackOutcome.Error("No authorization code received in callback.")
         }
+
+        // Extract state for validation in ViewModel
+        val state = uri.getQueryParameter("state")
+        
+        return OAuthCallbackOutcome.CodeReceived(code = code, state = state)
     }
 
     /**
@@ -165,14 +191,17 @@ class MetaOAuthClient(
                 "META_REDIRECT_URI is not set."
             }
             return MetaOAuthResult.ConfigurationRequired(
-                "Meta Developer Configuration Required: $missingDetail\n\nTo connect live accounts:\n1. Register an app on developers.facebook.com\n2. Add 'Facebook Login for Business'\n3. Set redirect URI to ${config.redirectUri}\n4. Add META_APP_ID to AI Studio Secrets panel."
+                "Meta Developer Configuration Required: $missingDetail\n\nTo connect live accounts:\n1. Register an app on developers.facebook.com\n2. Add 'Facebook Login for Business'\n3. Set redirect URI to: socialagent://meta-callback\n4. Request required permissions\n5. Deploy backend token exchange endpoint (see docs/BACKEND_INTEGRATION.md)\n6. Set META_OAUTH_BACKEND_URL in environment"
             )
         }
         return null
     }
 
     /**
-     * Fetches pages managed by user from Meta Graph API using secure token.
+     * Fetches pages managed by user from Meta Graph API using access token.
+     *
+     * CRITICAL: This assumes access token was obtained by backend from authorization code.
+     * Backend holds the token securely and provides it to this call via safe channel.
      */
     suspend fun fetchPagesFromGraphApi(accessToken: String): Result<List<FacebookPageInfo>> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
@@ -287,13 +316,12 @@ class MetaOAuthClient(
         tokenStore.clearAll()
     }
 
-    private fun generateSecureStateNonce(): String {
-        return "sa_" + (100000..999999).random()
+    /**
+     * Validate OAuth state from callback.
+     * Returns true if state is valid and matches stored state.
+     * Clears state after validation (success or failure).
+     */
+    fun validateOAuthState(receivedState: String?): Boolean {
+        return oauthState.validateAndClearState(receivedState)
     }
-}
-
-sealed interface OAuthCallbackOutcome {
-    data class CodeReceived(val code: String) : OAuthCallbackOutcome
-    data object PermissionDenied : OAuthCallbackOutcome
-    data class Error(val message: String) : OAuthCallbackOutcome
 }
