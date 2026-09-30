@@ -81,6 +81,7 @@ fun MetaConnectionScreen(
     var showDisconnectDialog by remember { mutableStateOf(false) }
     var showPreviewMockDialog by remember { mutableStateOf(false) }
     var showTokenDialog by remember { mutableStateOf(false) }
+    var showOAuthInfoDialog by remember { mutableStateOf(false) }
     var directTokenInput by remember { mutableStateOf("") }
 
     val launchMetaOAuth: (android.net.Uri) -> Unit = { authUri ->
@@ -430,37 +431,59 @@ fun MetaConnectionScreen(
                             }
                         }
                     } else {
-                        Text(
-                            text = "Connect the Facebook Page that administers your social channels.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Key,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Connect directly with a Page Access Token for instant setup without browser redirect errors.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Primary Action: Connect with Page Access Token (Recommended & Instant)
                         Button(
-                            onClick = { viewModel.connectFacebookPage(launchMetaOAuth) },
+                            onClick = { showTokenDialog = true },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("btn_connect_facebook"),
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2))
                         ) {
-                            Icon(Icons.Default.Link, contentDescription = null)
+                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Connect Facebook Page (OAuth)")
+                            Text("Connect Facebook Page (Token)")
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        // Secondary Action: Browser Login with Guidance Dialog
                         OutlinedButton(
-                            onClick = { showTokenDialog = true },
+                            onClick = { showOAuthInfoDialog = true },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("btn_connect_page_token"),
                             shape = RoundedCornerShape(10.dp)
                         ) {
-                            Icon(Icons.Default.Key, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Connect with Page Access Token")
+                            Text("Browser Login (OAuth)")
                         }
                     }
                 }
@@ -752,6 +775,60 @@ fun MetaConnectionScreen(
         )
     }
 
+    // Browser OAuth Guidance Dialog
+    if (showOAuthInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showOAuthInfoDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Browser Login Notice", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Facebook requires an HTTPS redirect URI configured in your Meta Developer Console for browser login. If unconfigured, Facebook shows:\n\"প্যারামিটারে কোনো রিডাইরেক্ট URI নেই: এই URI-তে কোনো রিডাইরেক্ট নেই\"",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Recommended: Use 'Connect with Page Token' below for an immediate, reliable connection without browser configuration.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showOAuthInfoDialog = false
+                        showTokenDialog = true
+                    }
+                ) {
+                    Text("Use Page Token (Instant)")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showOAuthInfoDialog = false
+                        viewModel.connectFacebookPage(launchMetaOAuth)
+                    }
+                ) {
+                    Text("Open Browser Anyway")
+                }
+            }
+        )
+    }
+
     // Direct Page Access Token Dialog
     if (showTokenDialog) {
         AlertDialog(
@@ -785,11 +862,24 @@ fun MetaConnectionScreen(
                         maxLines = 4,
                         label = { Text("Page Access Token") }
                     )
-                    Text(
-                        "This securely verifies your Facebook Page & linked Instagram account directly with Meta Graph API without requiring redirect URIs.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                "How to get a Page Token in 30 seconds:",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "1. Visit developers.facebook.com/tools/explorer\n2. In 'User or Page', select your Facebook Page\n3. Add permissions: pages_show_list, pages_read_engagement, pages_manage_posts\n4. Click 'Generate Access Token' and paste here.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
