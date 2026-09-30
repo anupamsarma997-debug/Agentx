@@ -241,14 +241,17 @@ class MetaOAuthClient(
 
     /**
      * Inspects linked Instagram Professional account for a given Facebook Page.
+     * Instagram is optional; if the Page is not linked to Instagram, lacks permissions,
+     * or returns any HTTP 400/error, this method safely ignores the error and returns null
+     * so that Facebook Page connection is never blocked.
      */
     suspend fun fetchInstagramForPage(pageId: String, pageToken: String): Result<InstagramAccountInfo?> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
             val url = URL("https://graph.facebook.com/v20.0/$pageId?fields=instagram_business_account{id,username,name}&access_token=$pageToken")
             conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 10000
-                readTimeout = 15000
+                connectTimeout = 8000
+                readTimeout = 10000
                 requestMethod = "GET"
             }
             val responseCode = conn.responseCode
@@ -261,7 +264,12 @@ class MetaOAuthClient(
                 } catch (_: Exception) {
                     "API Error ($responseCode)"
                 }
-                return@withContext Result.failure(Exception("Failed to check Instagram connection: $safeErr"))
+                android.util.Log.w(
+                    "MetaOAuthClient",
+                    "Instagram lookup skipped for Page $pageId (HTTP $responseCode): $safeErr. Proceeding with Facebook Page only."
+                )
+                // Non-blocking: safely return null so Instagram never blocks Facebook Page connection
+                return@withContext Result.success(null)
             }
 
             val root = JSONObject(respText)
@@ -269,18 +277,20 @@ class MetaOAuthClient(
             if (igObj != null) {
                 val igId = igObj.optString("id")
                 val username = igObj.optString("username")
-                val info = InstagramAccountInfo(
-                    instagramAccountId = igId,
-                    username = username,
-                    accountType = InstagramAccountType.PROFESSIONAL_BUSINESS,
-                    isConnected = true
-                )
-                Result.success(info)
-            } else {
-                Result.success(null)
+                if (igId.isNotBlank()) {
+                    val info = InstagramAccountInfo(
+                        instagramAccountId = igId,
+                        username = username.ifBlank { "instagram_business" },
+                        accountType = InstagramAccountType.PROFESSIONAL_BUSINESS,
+                        isConnected = true
+                    )
+                    return@withContext Result.success(info)
+                }
             }
-        } catch (e: Exception) {
-            Result.failure(Exception("Network error checking Instagram account: ${e.localizedMessage ?: "Unknown error"}"))
+            Result.success(null)
+        } catch (e: Throwable) {
+            android.util.Log.w("MetaOAuthClient", "Exception checking Instagram account: ${e.localizedMessage}. Proceeding with Facebook only.")
+            Result.success(null)
         } finally {
             conn?.disconnect()
         }
@@ -307,6 +317,7 @@ class MetaOAuthClient(
     suspend fun connectWithPageAccessToken(pageToken: String): Result<Pair<FacebookPageInfo, InstagramAccountInfo?>> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
+            // Initial validation queries /me for basic Page info (id and name) only
             val url = URL("https://graph.facebook.com/v20.0/me?fields=id,name&access_token=$pageToken")
             conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 10000
@@ -330,10 +341,12 @@ class MetaOAuthClient(
                     "Meta Graph API error (HTTP $responseCode, Code: $errCode, Subcode: $errSubcode, Type: $errType, Trace: $fbTraceId): $errMsg"
                 )
 
-                val errorDescription = when (errCode) {
-                    190 -> "Meta token expired or revoked (Error 190): $errMsg. Please generate a fresh Page Access Token."
-                    200, 10 -> "Missing permissions (Error $errCode): $errMsg. Ensure pages_show_list and pages_read_engagement permissions are granted."
-                    100 -> "Meta Graph API parameter error (Error 100): $errMsg"
+                val errorDescription = when {
+                    errCode == 190 -> "Meta token expired or revoked (Error 190): $errMsg. Please generate a fresh Page Access Token."
+                    errMsg.contains("pages_read_engagement", ignoreCase = true) ->
+                        "Missing permission (Error $errCode): Your Page Access Token requires the 'pages_read_engagement' permission. In Meta Graph API Explorer or Meta Business Suite, add 'pages_read_engagement' and 'pages_manage_posts' to the token permissions and try again."
+                    errCode in listOf(200, 10) -> "Missing permissions (Error $errCode): $errMsg. Ensure pages_show_list and pages_read_engagement permissions are granted."
+                    errCode == 100 -> "Meta Graph API parameter error (Error 100): $errMsg"
                     else -> "Meta API validation failed ($responseCode): $errMsg (code $errCode)"
                 }
                 return@withContext Result.failure(Exception(errorDescription))
@@ -372,7 +385,16 @@ class MetaOAuthClient(
                 isConnected = true,
                 hasAccessTokenRef = true
             )
-            val ig = fetchInstagramForPage(pageId, effectivePageToken).getOrNull()
+
+            // Instagram account discovery is completely optional and non-blocking.
+            // Any HTTP 400, permission, or missing link error is safely swallowed, returning null.
+            val ig: InstagramAccountInfo? = try {
+                fetchInstagramForPage(pageId, effectivePageToken).getOrNull()
+            } catch (e: Throwable) {
+                android.util.Log.w("MetaOAuthClient", "Non-blocking Instagram discovery error: ${e.message}")
+                null
+            }
+
             Result.success(fbPage to ig)
         } catch (e: Exception) {
             android.util.Log.e("MetaOAuthClient", "Exception during token validation", e)
