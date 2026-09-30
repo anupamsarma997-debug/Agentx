@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
 
     private fun handleIncomingOAuthIntent(intent: Intent?) {
         intent?.data?.let { uri ->
-            if (uri.scheme == "socialagent" && uri.host == "meta-callback") {
+            if (uri.scheme == "socialagent" && (uri.host == "meta-callback" || uri.host == "callback")) {
                 appViewModel.handleOAuthCallback(uri)
             }
         }

@@ -50,17 +50,24 @@ android {
     val metaAppId = (envProps.getProperty("META_APP_ID") ?: System.getenv("META_APP_ID") ?: "").trim()
     buildConfigField("String", "META_APP_ID", "\"$metaAppId\"")
 
-    val metaRedirectUri = (envProps.getProperty("META_REDIRECT_URI") ?: System.getenv("META_REDIRECT_URI") ?: "socialagent://meta-callback").trim()
+    val rawRedirectUri = (envProps.getProperty("META_REDIRECT_URI") ?: System.getenv("META_REDIRECT_URI") ?: "").trim()
+    val metaRedirectUri = if (rawRedirectUri.isNotBlank() && !rawRedirectUri.startsWith("http://localhost") && !rawRedirectUri.startsWith("http://127.0.0.1")) {
+      rawRedirectUri
+    } else {
+      "socialagent://meta-callback"
+    }
     buildConfigField("String", "META_REDIRECT_URI", "\"$metaRedirectUri\"")
   }
 
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+    val releaseKeystore = file(System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks")
+    if (releaseKeystore.exists()) {
+      create("release") {
+        storeFile = releaseKeystore
+        storePassword = System.getenv("STORE_PASSWORD")
+        keyAlias = "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
+      }
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -75,7 +82,11 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      signingConfig = if (signingConfigs.findByName("release") != null) {
+        signingConfigs.getByName("release")
+      } else {
+        signingConfigs.getByName("debugConfig")
+      }
     }
     debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }

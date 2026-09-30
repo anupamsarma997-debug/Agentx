@@ -258,4 +258,33 @@ class MetaConnectionTest {
         assertEquals(MetaConnectionStatus.CONNECTING, repository.connectionState.value.status)
         assertTrue(repository.connectionState.value.isAuthenticating)
     }
+
+    // 14. Deep link intent resolution for Android OS routing
+    @Test
+    fun `test 14 - intent filters resolve socialagent meta-callback deep link`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val packageManager = context.packageManager
+
+        val intent = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse("socialagent://meta-callback?code=test_code&state=test_state")
+        ).apply {
+            addCategory(android.content.Intent.CATEGORY_DEFAULT)
+            addCategory(android.content.Intent.CATEGORY_BROWSABLE)
+        }
+
+        val resolveInfos = packageManager.queryIntentActivities(intent, 0)
+        assertFalse("At least one activity must resolve socialagent://meta-callback", resolveInfos.isEmpty())
+        val matchingActivity = resolveInfos.firstOrNull { it.activityInfo.name == "com.example.MainActivity" }
+        assertNotNull("MainActivity must handle socialagent://meta-callback", matchingActivity)
+        assertTrue("MainActivity must be exported to receive system browser callbacks", matchingActivity!!.activityInfo.exported)
+    }
+
+    // 15. Canonical redirect URI never defaults to localhost in Android APK
+    @Test
+    fun `test 15 - canonical redirect URI is socialagent meta-callback and never localhost`() {
+        val redirect = com.example.data.remote.meta.MetaOAuthConfig.resolveRedirectUri()
+        assertEquals("socialagent://meta-callback", redirect)
+        assertFalse(redirect.contains("localhost"))
+    }
 }

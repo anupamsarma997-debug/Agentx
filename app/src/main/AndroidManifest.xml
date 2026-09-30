@@ -46,6 +46,14 @@
                     android:host="meta-callback"
                     android:scheme="socialagent" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="callback"
+                    android:scheme="socialagent" />
+            </intent-filter>
         </activity>
     </application>
 

@@ -79,7 +79,10 @@ data class MetaOAuthConfig(
             } catch (_: Throwable) {
                 null
             }
-            if (!fromBuildConfig.isNullOrBlank()) {
+            if (!fromBuildConfig.isNullOrBlank() &&
+                !fromBuildConfig.startsWith("http://localhost") &&
+                !fromBuildConfig.startsWith("http://127.0.0.1")
+            ) {
                 return fromBuildConfig.trim()
             }
             return "socialagent://meta-callback"
