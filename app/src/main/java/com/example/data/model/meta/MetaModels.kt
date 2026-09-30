@@ -22,6 +22,7 @@ enum class InstagramAccountType(val displayName: String) {
 data class FacebookPageInfo(
     val pageId: String,
     val pageName: String,
+    val category: String = "Facebook Page",
     val isConnected: Boolean = true,
     val hasAccessTokenRef: Boolean = false
 ) {

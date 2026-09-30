@@ -198,7 +198,7 @@ class MetaOAuthClient(
     suspend fun fetchPagesFromGraphApi(accessToken: String): Result<List<FacebookPageInfo>> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
-            val url = URL("https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token&access_token=$accessToken")
+            val url = URL("https://graph.facebook.com/v20.0/me/accounts?fields=id,name,access_token&access_token=$accessToken")
             conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 10000
                 readTimeout = 15000
@@ -245,7 +245,7 @@ class MetaOAuthClient(
     suspend fun fetchInstagramForPage(pageId: String, pageToken: String): Result<InstagramAccountInfo?> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
-            val url = URL("https://graph.facebook.com/v19.0/$pageId?fields=instagram_business_account{id,username,name}&access_token=$pageToken")
+            val url = URL("https://graph.facebook.com/v20.0/$pageId?fields=instagram_business_account{id,username,name}&access_token=$pageToken")
             conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 10000
                 readTimeout = 15000
@@ -307,7 +307,7 @@ class MetaOAuthClient(
     suspend fun connectWithPageAccessToken(pageToken: String): Result<Pair<FacebookPageInfo, InstagramAccountInfo?>> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
-            val url = URL("https://graph.facebook.com/v19.0/me?fields=id,name,category&access_token=$pageToken")
+            val url = URL("https://graph.facebook.com/v20.0/me?fields=id,name&access_token=$pageToken")
             conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 10000
                 readTimeout = 15000
@@ -320,11 +320,21 @@ class MetaOAuthClient(
             if (responseCode !in 200..299) {
                 val errObj = try { JSONObject(respText).optJSONObject("error") } catch (_: Exception) { null }
                 val errCode = errObj?.optInt("code", 0) ?: 0
+                val errSubcode = errObj?.optInt("error_subcode", 0) ?: 0
+                val errType = errObj?.optString("type") ?: "OAuthException"
                 val errMsg = errObj?.optString("message") ?: "API Error ($responseCode)"
+                val fbTraceId = errObj?.optString("fbtrace_id") ?: ""
+
+                android.util.Log.e(
+                    "MetaOAuthClient",
+                    "Meta Graph API error (HTTP $responseCode, Code: $errCode, Subcode: $errSubcode, Type: $errType, Trace: $fbTraceId): $errMsg"
+                )
+
                 val errorDescription = when (errCode) {
-                    190 -> "Meta token expired or revoked (Error 190): $errMsg. Please generate a fresh token."
+                    190 -> "Meta token expired or revoked (Error 190): $errMsg. Please generate a fresh Page Access Token."
                     200, 10 -> "Missing permissions (Error $errCode): $errMsg. Ensure pages_show_list and pages_read_engagement permissions are granted."
-                    else -> "Meta API validation failed ($responseCode): $errMsg"
+                    100 -> "Meta Graph API parameter error (Error 100): $errMsg"
+                    else -> "Meta API validation failed ($responseCode): $errMsg (code $errCode)"
                 }
                 return@withContext Result.failure(Exception(errorDescription))
             }
@@ -334,8 +344,8 @@ class MetaOAuthClient(
             var pageName = json.optString("name")
             var effectivePageToken = pageToken
 
-            // If the /me endpoint did not return a Page category (e.g. user personal token), inspect /me/accounts
-            if (!json.has("category") || pageId.isBlank()) {
+            // If pageId or pageName is blank, check if a User Access Token was provided instead of a Page Access Token
+            if (pageId.isBlank() || pageName.isBlank()) {
                 val accountsResult = fetchPagesFromGraphApi(pageToken)
                 val pages = accountsResult.getOrNull()
                 if (!pages.isNullOrEmpty()) {
@@ -345,7 +355,7 @@ class MetaOAuthClient(
                     effectivePageToken = getPageToken(pageId) ?: pageToken
                 } else {
                     return@withContext Result.failure(
-                        Exception("No administered Facebook Pages found for this token. Please provide a Page Access Token with 'pages_show_list' permission.")
+                        Exception("No administered Facebook Pages found for this token. Please provide a valid Page Access Token.")
                     )
                 }
             }
@@ -355,10 +365,17 @@ class MetaOAuthClient(
             }
 
             storePageTokenSafely(pageId, effectivePageToken)
-            val fbPage = FacebookPageInfo(pageId = pageId, pageName = pageName, isConnected = true, hasAccessTokenRef = true)
+            val fbPage = FacebookPageInfo(
+                pageId = pageId,
+                pageName = pageName,
+                category = json.optString("category", "Facebook Page").ifBlank { "Facebook Page" },
+                isConnected = true,
+                hasAccessTokenRef = true
+            )
             val ig = fetchInstagramForPage(pageId, effectivePageToken).getOrNull()
             Result.success(fbPage to ig)
         } catch (e: Exception) {
+            android.util.Log.e("MetaOAuthClient", "Exception during token validation", e)
             Result.failure(Exception("Error validating token: ${e.localizedMessage ?: "Network error"}"))
         } finally {
             conn?.disconnect()

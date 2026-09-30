@@ -395,7 +395,7 @@ fun MetaConnectionScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Page ID: ${fb.maskedPageId}",
+                                text = "Page ID: ${fb.maskedPageId} • ${fb.category}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
