@@ -20,6 +20,9 @@ interface ContentDao {
     @Query("SELECT * FROM content_items ORDER BY createdAt DESC")
     fun getAllContent(): Flow<List<ContentEntity>>
 
+    @Query("SELECT * FROM content_items")
+    suspend fun getAllContentSync(): List<ContentEntity>
+
     @Query("SELECT * FROM content_items WHERE generationStatus = :status ORDER BY createdAt DESC")
     fun getContentByStatus(status: String): Flow<List<ContentEntity>>
 
@@ -32,6 +35,25 @@ interface ContentDao {
     @Query("UPDATE content_items SET generationStatus = :status, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateStatus(id: String, status: String, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE content_items SET generationStatus = :status, validationFailures = :failures, isSourceVerified = :isSourceVerified, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateApprovalValidation(
+        id: String,
+        status: String,
+        failures: String?,
+        isSourceVerified: Boolean,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("UPDATE content_items SET generationStatus = 'PUBLISHED', facebookPostId = :postId, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateFacebookPublished(
+        id: String,
+        postId: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("SELECT * FROM content_items WHERE generationStatus = :status ORDER BY createdAt DESC LIMIT :limit")
+    suspend fun getContentByStatusSync(status: String, limit: Int = 10): List<ContentEntity>
+
     @Query("UPDATE content_items SET title = :title, body = :body, caption = :caption, hashtags = :hashtags, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateContentDraft(
         id: String,
@@ -39,6 +61,13 @@ interface ContentDao {
         body: String,
         caption: String,
         hashtags: String,
+        updatedAt: Long = System.currentTimeMillis()
+    )
+
+    @Query("UPDATE content_items SET imageUrl = :imageUrl, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateImageUrl(
+        id: String,
+        imageUrl: String?,
         updatedAt: Long = System.currentTimeMillis()
     )
 

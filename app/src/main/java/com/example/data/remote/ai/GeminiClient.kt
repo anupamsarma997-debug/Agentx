@@ -1,6 +1,8 @@
 package com.example.data.remote.ai
 
 import com.example.BuildConfig
+import com.example.data.local.logging.AppLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -145,6 +147,7 @@ open class GeminiClient(
                 put("generationConfig", JSONObject().apply {
                     put("responseMimeType", "application/json")
                     put("temperature", 0.2)
+                    put("maxOutputTokens", 2048)
                 })
             }
 
@@ -199,11 +202,15 @@ open class GeminiClient(
 
             return AIResult.Success(text)
         } catch (e: SocketTimeoutException) {
-            return AIResult.Error("Connection to Gemini timed out. Please check your internet connection.", e)
+            AppLogger.warn("Gemini", "Generate", "Connection to Gemini timed out", e)
+            return AIResult.Error("Gemini service temporarily unavailable hai (timeout). Please try again.", e)
         } catch (e: UnknownHostException) {
-            return AIResult.Error("Unable to reach Gemini servers. Please check your network connection.", e)
+            AppLogger.warn("Gemini", "Generate", "Internet host unreachable", e)
+            return AIResult.Error("Internet connection nahi hai. Please check your network connection.", e)
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             val sanitizedMsg = sanitizeExceptionMessage(e.localizedMessage ?: "Unknown error", apiKey)
+            AppLogger.error("Gemini", "Generate", "Network error calling Gemini: $sanitizedMsg", e)
             return AIResult.Error("Network error calling Gemini: $sanitizedMsg", e)
         } finally {
             connection?.disconnect()
@@ -242,6 +249,49 @@ open class GeminiClient(
             msg.replace(apiKey, "[REDACTED]")
         } else {
             msg
+        }
+    }
+
+    /**
+     * Safely fetches live source page HTML text (first ~4000 characters) via HTTP GET.
+     * Respects 8-second timeout, follows redirects, and strips raw HTML tags.
+     */
+    suspend fun fetchLiveSourcePageText(urlString: String, timeoutMs: Int = 8000): String? = withContext(Dispatchers.IO) {
+        if (!urlString.startsWith("http://") && !urlString.startsWith("https://")) return@withContext null
+        var conn: HttpURLConnection? = null
+        try {
+            val url = URL(urlString)
+            conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = timeoutMs
+                readTimeout = timeoutMs
+                instanceFollowRedirects = true
+                requestMethod = "GET"
+                setRequestProperty(
+                    "User-Agent",
+                    "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36 SocialAgent/1.0"
+                )
+                setRequestProperty("Accept", "text/html,text/plain")
+            }
+            if (conn.responseCode == 200) {
+                val rawHtml = conn.inputStream.bufferedReader().use { r ->
+                    val buf = CharArray(16384)
+                    val len = r.read(buf, 0, buf.size)
+                    if (len > 0) String(buf, 0, len) else ""
+                }
+                // Strip tags and compress whitespace
+                rawHtml.replace(Regex("<script[^>]*>.*?</script>", RegexOption.DOT_MATCHES_ALL), " ")
+                    .replace(Regex("<style[^>]*>.*?</style>", RegexOption.DOT_MATCHES_ALL), " ")
+                    .replace(Regex("<[^>]+>"), " ")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                    .take(4000)
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        } finally {
+            conn?.disconnect()
         }
     }
 }

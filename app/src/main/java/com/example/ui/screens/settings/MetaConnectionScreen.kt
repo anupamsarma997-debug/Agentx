@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -83,6 +85,8 @@ fun MetaConnectionScreen(
     var showTokenDialog by remember { mutableStateOf(false) }
     var showOAuthInfoDialog by remember { mutableStateOf(false) }
     var directTokenInput by remember { mutableStateOf("") }
+    var isSendingTestPost by remember { mutableStateOf(false) }
+    var testPostResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     val launchMetaOAuth: (android.net.Uri) -> Unit = { authUri ->
         try {
@@ -113,6 +117,17 @@ fun MetaConnectionScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back to Settings"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.refreshMetaConnection() },
+                        modifier = Modifier.testTag("btn_meta_refresh")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Connection Status"
                         )
                     }
                 },
@@ -428,6 +443,47 @@ fun MetaConnectionScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("Reconnect")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Button(
+                            onClick = {
+                                isSendingTestPost = true
+                                viewModel.sendTestPostToFacebookPage { success, message ->
+                                    isSendingTestPost = false
+                                    testPostResult = Pair(success, message)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_test_post_facebook"),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                            shape = RoundedCornerShape(8.dp),
+                            enabled = !isSendingTestPost
+                        ) {
+                            if (isSendingTestPost) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sending Test Post...", color = Color.White)
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "TEST POST TO FACEBOOK PAGE",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             }
                         }
                     } else {
@@ -900,6 +956,38 @@ fun MetaConnectionScreen(
             dismissButton = {
                 TextButton(onClick = { showTokenDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (testPostResult != null) {
+        val (success, message) = testPostResult!!
+        AlertDialog(
+            onDismissRequest = { testPostResult = null },
+            modifier = Modifier.testTag("dialog_test_post_result"),
+            title = {
+                Text(
+                    text = if (success) "Test Post Successful!" else "Test Post Failed",
+                    fontWeight = FontWeight.Bold,
+                    color = if (success) Color(0xFF166534) else Color(0xFFDC2626)
+                )
+            },
+            text = {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { testPostResult = null },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (success) Color(0xFF166534) else MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.testTag("btn_close_test_post_dialog")
+                ) {
+                    Text("OK")
                 }
             }
         )

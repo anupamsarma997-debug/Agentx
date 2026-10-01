@@ -1,5 +1,6 @@
 package com.example.ui.screens.queue
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +24,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -56,6 +60,9 @@ import com.example.data.local.entity.ContentEntity
 import com.example.data.model.content.GenerationStatus
 import com.example.ui.screens.opportunities.VerificationBadge
 import com.example.ui.viewmodel.AppViewModel
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -90,6 +97,7 @@ fun ContentQueueScreen(
     val memes by viewModel.allMemes.collectAsState()
     val reels by viewModel.allReels.collectAsState()
     val allVerificationRecords by viewModel.allVerificationRecords.collectAsState()
+    val activeValidationResult by viewModel.activeValidationResult.collectAsState()
     val recordMap = remember(allVerificationRecords) {
         allVerificationRecords.associateBy { it.contentId }
     }
@@ -102,6 +110,22 @@ fun ContentQueueScreen(
     var memeToRegenerate by remember { mutableStateOf<MemeDraftEntity?>(null) }
     var activePreviewReel by remember { mutableStateOf<ReelDraftEntity?>(null) }
     var reelToRegenerate by remember { mutableStateOf<ReelDraftEntity?>(null) }
+
+    // Transparent Approval Validation Dialog
+    activeValidationResult?.let { (item, validation) ->
+        ApprovalValidationDialog(
+            item = item,
+            validationResult = validation,
+            onDismiss = { viewModel.dismissValidationDialog() },
+            onEditField = { targetItem ->
+                viewModel.dismissValidationDialog()
+                onNavigateToPreview(targetItem.id)
+            },
+            onApproveAnyway = {
+                viewModel.approveContent(item.id, "POST", overrideWarnings = true)
+            }
+        )
+    }
 
     val postDrafts = when (selectedTabIndex) {
         1 -> queue // POSTS
@@ -345,6 +369,7 @@ fun ContentQueueScreen(
                         onView = { onNavigateToPreview(item.id) },
                         onVerify = { onNavigateToVerification(item.id, "POST") },
                         onApprove = { viewModel.approveContent(item.id, "POST") },
+                        onPublish = { viewModel.publishToFacebook(item.id) },
                         onReject = { viewModel.rejectContent(item.id, "POST", RejectionReason.USER_REJECTED) },
                         onDelete = { viewModel.deleteContentDraft(item.id) }
                     )
@@ -633,12 +658,47 @@ fun MemeStatusBadge(status: MemeGenerationStatus, modifier: Modifier = Modifier)
 }
 
 @Composable
+fun SourceVerificationBadge(isVerified: Boolean, modifier: Modifier = Modifier) {
+    val (bgColor, textColor, label) = if (isVerified) {
+        Triple(Color(0xFFDCFCE7), Color(0xFF166534), "VERIFIED")
+    } else {
+        Triple(Color(0xFFFEF3C7), Color(0xFF92400E), "UNVERIFIED")
+    }
+
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = bgColor,
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(textColor)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = textColor
+            )
+        }
+    }
+}
+
+@Composable
 fun QueueItemCard(
     item: ContentEntity,
     record: FinalVerificationRecordEntity? = null,
     onView: () -> Unit,
     onVerify: () -> Unit = {},
     onApprove: () -> Unit,
+    onPublish: () -> Unit = {},
     onReject: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
@@ -652,7 +712,7 @@ fun QueueItemCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Badges row
+            // Badges row: Exactly TWO badges (Source Verification + Generation Status)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -672,57 +732,102 @@ fun QueueItemCard(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FinalVerificationBadge(status = record?.finalStatusEnum ?: FinalVerificationStatus.PENDING)
-                    VerificationBadge(status = item.verificationStatusEnum)
+                    SourceVerificationBadge(isVerified = item.isSourceVerified)
                     GenerationStatusBadge(status = item.generationStatusEnum)
                 }
             }
 
-            if (record?.humanReviewRequired == true) {
-                Spacer(modifier = Modifier.height(6.dp))
-                HumanReviewRequiredBadge()
-            }
-
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Title
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            // Title, Thumbnail & Body Preview
+            Row(modifier = Modifier.fillMaxWidth()) {
+                if (!item.imageUrl.isNullOrBlank()) {
+                    val cleanPath = item.imageUrl.removePrefix("file://")
+                    val imageFile = File(cleanPath)
+                    AsyncImage(
+                        model = if (imageFile.exists()) imageFile else item.imageUrl,
+                        contentDescription = "Post Banner Thumbnail",
+                        modifier = Modifier
+                            .size(68.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                }
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    // Title
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
 
-            // Body Snippet
-            Text(
-                text = item.body,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+                    Spacer(modifier = Modifier.height(3.dp))
+
+                    // Body Preview
+                    Text(
+                        text = item.body,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // If validation failures exist in DB and post is not approved
+            if (!item.validationFailures.isNullOrBlank() && item.generationStatusEnum != GenerationStatus.APPROVED) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFEF2F2),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFDC2626),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = item.validationFailures.lines().firstOrNull() ?: "Review required",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF991B1B),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Metadata info
+            // Clean Source Domain display on its own metadata row (Task 3d)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Platform: ${item.platformEnum.displayName} | Source: ${item.sourceName}",
+                    text = "Source: ${item.getSourceDomain()}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = formatQueueDate(item.createdAt),
+                    text = "${item.platformEnum.displayName} • ${formatQueueDate(item.createdAt)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline
                 )
@@ -730,7 +835,7 @@ fun QueueItemCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action Buttons: VIEW, EDIT, APPROVE, REJECT, DELETE
+            // Action Buttons: VIEW, EDIT, APPROVE / PUBLISH TO FACEBOOK, REJECT, DELETE
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -738,7 +843,7 @@ fun QueueItemCard(
             ) {
                 OutlinedButton(
                     onClick = onView,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.testTag("btn_view_${item.id}")
                 ) {
@@ -749,7 +854,7 @@ fun QueueItemCard(
 
                 OutlinedButton(
                     onClick = onView,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.testTag("btn_edit_${item.id}")
                 ) {
@@ -758,28 +863,84 @@ fun QueueItemCard(
                     Text("EDIT", style = MaterialTheme.typography.labelSmall)
                 }
 
-                Button(
-                    onClick = onApprove,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("btn_approve_${item.id}")
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("APPROVE", style = MaterialTheme.typography.labelSmall)
-                }
+                if (item.generationStatusEnum == GenerationStatus.APPROVED) {
+                    if (!item.facebookPostId.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = Color(0xFFD1FAE5)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF065F46), modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("PUBLISHED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF065F46))
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = onPublish,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_publish_${item.id}")
+                        ) {
+                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("PUBLISH TO FB", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else if (item.generationStatusEnum == GenerationStatus.PUBLISHED) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFD1FAE5)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF065F46), modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("PUBLISHED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF065F46))
+                        }
+                    }
+                } else if (item.generationStatusEnum == GenerationStatus.FAILED) {
+                    Button(
+                        onClick = onPublish,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_retry_publish_${item.id}")
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("RETRY FB", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    }
+                } else {
+                    Button(
+                        onClick = onApprove,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_approve_${item.id}")
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("APPROVE", style = MaterialTheme.typography.labelSmall)
+                    }
 
-                OutlinedButton(
-                    onClick = onReject,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("btn_reject_${item.id}")
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("REJECT", style = MaterialTheme.typography.labelSmall)
+                    OutlinedButton(
+                        onClick = onReject,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_reject_${item.id}")
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("REJECT", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))

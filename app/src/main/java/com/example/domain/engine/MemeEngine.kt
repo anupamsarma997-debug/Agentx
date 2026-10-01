@@ -44,6 +44,9 @@ class MemeEngine(
             VerificationStatus.EXPIRED -> Result.failure(
                 IllegalArgumentException("Cannot generate meme for an expired source opportunity.")
             )
+            VerificationStatus.FAILED -> Result.failure(
+                IllegalArgumentException("Cannot generate meme for a failed or unverified source opportunity.")
+            )
             VerificationStatus.REJECTED -> Result.failure(
                 IllegalArgumentException("Cannot generate meme for a rejected source opportunity.")
             )

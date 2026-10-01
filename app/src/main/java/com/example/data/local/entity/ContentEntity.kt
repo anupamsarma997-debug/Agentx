@@ -34,7 +34,11 @@ data class ContentEntity(
     val generationStatus: String = GenerationStatus.DRAFT.name,
     val verificationStatus: String = VerificationStatus.NEEDS_REVIEW.name,
     val aiModel: String = "gemini-2.5-flash",
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val facebookPostId: String? = null,
+    val validationFailures: String? = null,
+    val isSourceVerified: Boolean = false,
+    val imageUrl: String? = null
 ) {
     val contentTypeEnum: ContentType
         get() = ContentType.fromString(contentType)
@@ -52,5 +56,19 @@ data class ContentEntity(
         return hashtags.split(",")
             .map { it.trim() }
             .filter { it.isNotBlank() }
+    }
+
+    fun getSourceDomain(): String {
+        return try {
+            val uri = java.net.URI(sourceUrl)
+            val host = uri.host
+            if (!host.isNullOrBlank()) {
+                host.removePrefix("www.")
+            } else {
+                sourceName.ifBlank { "source" }
+            }
+        } catch (_: Exception) {
+            sourceName.ifBlank { "source" }
+        }
     }
 }

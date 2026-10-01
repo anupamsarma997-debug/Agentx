@@ -37,6 +37,9 @@ class ContentCreationEngine(
             VerificationStatus.EXPIRED -> GenerationGateResult.Blocked(
                 "Cannot generate promotional content for an expired opportunity."
             )
+            VerificationStatus.FAILED -> GenerationGateResult.Blocked(
+                "Cannot generate content for an unverified or dead link."
+            )
             VerificationStatus.REJECTED -> GenerationGateResult.Blocked(
                 "Cannot generate content for a rejected or fraudulent opportunity."
             )
@@ -62,14 +65,16 @@ class ContentCreationEngine(
             You are a factual social media copy assistant for an Indian opportunity and news portal.
             
             CORE MANDATE: SOURCE FACTS FIRST.
+            - Sirf wahi facts likho jo given source text me hon. Date, deadline, stipend ya eligibility guess mat karo. Na mile to likho 'details official site par dekhein'.
             - Never invent facts, statistics, organizations, URLs, or deadlines.
-            - If any information is missing or not provided, explicitly write "Not specified by source".
+            - If any information is missing or not provided, explicitly write "Details official site par dekhein".
+            - Do NOT truncate any field with "..." or leave sentences incomplete. Complete every sentence cleanly.
             - Tone: clear, concise, informative, mobile-friendly Indian English. No clickbait or sensationalism.
             - Length Target: ${length.displayName} (${length.wordCountGuide}, target ~${length.targetWords} words).
             - Platform Target: ${platform.displayName}.
             - Content Type: ${contentType.displayName}.
             - Hashtags: Maximum 8 highly relevant hashtags.
-            - Call to Action: Factual only (e.g. "Check the official source for eligibility and application details.").
+            - Call to Action: Factual only (e.g. "Apply or check eligibility on the official portal.").
             
             REGIONAL HEADERS:
             - If the opportunity region is Assam: start with "📢 Assam Opportunity Alert"
@@ -84,12 +89,14 @@ class ContentCreationEngine(
             OUTPUT REQUIREMENT:
             Return ONLY a valid JSON object matching this exact schema:
             {
-              "title": "Concise headline",
-              "body": "Formatted post body with details, deadline, eligibility, and source URL",
-              "caption": "Short caption for Instagram/Facebook feed",
+              "title": "Concise headline (min 5 characters, no ellipsis)",
+              "facebookBody": "Full Facebook post body (min 100 characters with complete sentences, details, and call to action)",
+              "instagramCaption": "Short caption for Instagram feed with key bullet points",
               "hashtags": ["tag1", "tag2"],
               "sourceUrl": "The exact source URL provided in the prompt",
-              "sourceName": "The exact source name provided in the prompt",
+              "sourceName": "The official source organization name",
+              "deadline": "Exact deadline string if in source, otherwise null",
+              "eligibility": "Exact eligibility if in source, otherwise 'Details official site par dekhein'",
               "contentType": "${contentType.name}",
               "platform": "${platform.name}",
               "confidence": "HIGH",
@@ -99,9 +106,15 @@ class ContentCreationEngine(
     }
 
     /**
-     * Formats structured source facts into a clean factual prompt.
+     * Formats structured source facts and live fetched page context into a clean factual prompt.
      */
-    fun buildUserPrompt(fact: SourceFact): String {
+    fun buildUserPrompt(fact: SourceFact, liveSourceText: String? = null): String {
+        val contextSnippet = if (!liveSourceText.isNullOrBlank()) {
+            "\n\nLIVE SOURCE PAGE TEXT (Use ONLY these verified facts):\n$liveSourceText"
+        } else {
+            ""
+        }
+
         return """
             GENERATE SOCIAL MEDIA POST DRAFT FROM THESE VERIFIED SOURCE FACTS:
             - Title: ${fact.title}
@@ -114,9 +127,12 @@ class ContentCreationEngine(
             - Published Date: ${fact.publishedAt ?: "Not specified"}
             - Source Entity: ${fact.sourceName}
             - Source URL: ${fact.sourceUrl}
-            - Verification State: ${fact.verificationStatus}
+            - Verification State: ${fact.verificationStatus}$contextSnippet
             
-            CRITICAL: The sourceUrl in your response MUST BE EXACTLY: ${fact.sourceUrl}
+            CRITICAL RULES:
+            1. The sourceUrl in your response MUST BE EXACTLY: ${fact.sourceUrl}
+            2. Never write literal "..." or cut off sentences. Provide a complete, fully-written post body.
+            3. Do not invent any deadline or stipend. If missing in source facts, state: 'Details official site par dekhein'.
         """.trimIndent()
     }
 
@@ -135,10 +151,35 @@ class ContentCreationEngine(
             return ContentCreationOutcome.Error(gate.reason)
         }
 
-        val systemPrompt = buildSystemPrompt(contentType, platform, length)
-        val userPrompt = buildUserPrompt(fact)
+        // Fetch live source page text via HTTP GET with 8s timeout to ensure factual grounded generation
+        val liveSourceText = geminiClient.fetchLiveSourcePageText(fact.sourceUrl)
 
-        val aiResult = geminiClient.generateContent(systemPrompt, userPrompt)
+        val systemPrompt = buildSystemPrompt(contentType, platform, length, fact)
+        val userPrompt = buildUserPrompt(fact, liveSourceText)
+
+        // Attempt 1: Standard generation
+        var aiResult = geminiClient.generateContent(systemPrompt, userPrompt)
+
+        if (aiResult is AIResult.Success) {
+            val firstTryValidation = validateAndParseResponse(
+                rawJson = aiResult.jsonText,
+                expectedSourceUrl = fact.sourceUrl,
+                expectedSourceName = fact.sourceName,
+                expectedDeadline = fact.deadline,
+                expectedContentType = contentType,
+                expectedPlatform = platform,
+                liveSourceText = liveSourceText
+            )
+
+            if (firstTryValidation.isSuccess) {
+                val initialStatus = resolveInitialStatus(verificationStatus)
+                return ContentCreationOutcome.Success(firstTryValidation.getOrThrow(), initialStatus)
+            }
+
+            // If truncated or malformed, attempt one automatic retry with strict anti-truncation prompt
+            val retryUserPrompt = "$userPrompt\n\nATTENTION: Your previous output was rejected because a field was empty, truncated with '...', or incomplete. Provide complete non-truncated JSON."
+            aiResult = geminiClient.generateContent(systemPrompt, retryUserPrompt)
+        }
 
         return when (aiResult) {
             is AIResult.ConfigurationRequired -> {
@@ -154,20 +195,40 @@ class ContentCreationEngine(
                     expectedSourceName = fact.sourceName,
                     expectedDeadline = fact.deadline,
                     expectedContentType = contentType,
-                    expectedPlatform = platform
+                    expectedPlatform = platform,
+                    liveSourceText = liveSourceText
                 )
 
                 if (validation.isSuccess) {
                     val initialStatus = resolveInitialStatus(verificationStatus)
                     ContentCreationOutcome.Success(validation.getOrThrow(), initialStatus)
                 } else {
-                    ContentCreationOutcome.Error(
-                        "AI validation failed: ${validation.exceptionOrNull()?.message ?: "Malformed response"}"
+                    // Fallback to Needs Review with factual baseline so user never loses work
+                    val fallbackResult = GeneratedContentResult(
+                        title = fact.title,
+                        body = "${fact.title}\n\n${fact.description}\n\nEligibility: ${fact.eligibility ?: "Details official site par dekhein"}\nDeadline: ${fact.deadline ?: "Details official site par dekhein"}\nOfficial Portal: ${fact.sourceUrl}",
+                        caption = "${fact.title} - Apply at ${fact.sourceUrl}",
+                        hashtags = listOf("#Opportunity", "#Career", "#Alert"),
+                        sourceUrl = fact.sourceUrl,
+                        sourceName = fact.sourceName,
+                        contentType = contentType,
+                        platform = platform,
+                        confidence = "MEDIUM",
+                        needsReview = true,
+                        rawJson = "{}"
                     )
+                    ContentCreationOutcome.Success(fallbackResult, GenerationStatus.NEEDS_REVIEW)
                 }
             }
         }
     }
+
+    private fun buildSystemPrompt(
+        contentType: ContentType,
+        platform: ContentPlatform,
+        length: ContentLength,
+        fact: SourceFact
+    ): String = buildSystemPrompt(contentType, platform, length)
 
     /**
      * Strict JSON validator ensuring AI did not fabricate URLs, deadlines, or omit required fields.
@@ -178,7 +239,8 @@ class ContentCreationEngine(
         expectedSourceName: String,
         expectedDeadline: String?,
         expectedContentType: ContentType,
-        expectedPlatform: ContentPlatform
+        expectedPlatform: ContentPlatform,
+        liveSourceText: String? = null
     ): Result<GeneratedContentResult> {
         return try {
             // Strip markdown code fences if present (e.g., ```json ... ```)
@@ -190,17 +252,30 @@ class ContentCreationEngine(
 
             val json = JSONObject(cleanedJson)
 
-            val title = json.optString("title")
-            if (title.isBlank()) {
-                return Result.failure(IllegalArgumentException("Missing title in AI output"))
+            val title = json.optString("title").trim()
+            if (title.isBlank() || title == "..." || title.endsWith("...")) {
+                return Result.failure(IllegalArgumentException("Missing or truncated title in AI output"))
             }
 
-            val body = json.optString("body")
-            if (body.isBlank()) {
-                return Result.failure(IllegalArgumentException("Missing post body in AI output"))
+            // Support both facebookBody and body
+            val rawBody = if (json.has("facebookBody")) {
+                json.optString("facebookBody")
+            } else {
+                json.optString("body")
+            }.trim()
+
+            if (rawBody.isBlank() || rawBody == "..." || rawBody.endsWith("...")) {
+                return Result.failure(IllegalArgumentException("Missing or truncated post body in AI output"))
             }
 
-            val caption = json.optString("caption").ifBlank { body.take(150) }
+            // Check if body is suspiciously short (< 50 chars) or literally just "..."
+            if (rawBody.length < 50) {
+                return Result.failure(IllegalArgumentException("Post body too short (${rawBody.length} chars)"))
+            }
+
+            val caption = json.optString("instagramCaption").ifBlank {
+                json.optString("caption").ifBlank { rawBody.take(150) }
+            }.trim()
 
             // Validate hashtags (max 8)
             val hashtagsArray = json.optJSONArray("hashtags") ?: JSONArray()
@@ -215,10 +290,10 @@ class ContentCreationEngine(
             val safeHashtags = hashtagsList.take(8)
 
             // CRITICAL FACT PROTECTION: The sourceUrl MUST come from the original OpportunityEntity.
-            // Even if AI alters the URL, we strictly force the verified expectedSourceUrl.
             val finalSourceUrl = expectedSourceUrl
 
-            // If source had no deadline, check for fabricated specific date claims in title
+            // If source had no deadline, check for fabricated specific date claims in title or body
+            var cleanBody = rawBody
             if (expectedDeadline.isNullOrBlank()) {
                 val lowercaseTitle = title.lowercase()
                 if (lowercaseTitle.contains("deadline: 202") || lowercaseTitle.contains("last date: 202")) {
@@ -229,9 +304,9 @@ class ContentCreationEngine(
             }
 
             val parsedResult = GeneratedContentResult(
-                title = title.trim(),
-                body = body.trim(),
-                caption = caption.trim(),
+                title = title,
+                body = cleanBody,
+                caption = caption,
                 hashtags = safeHashtags,
                 sourceUrl = finalSourceUrl,
                 sourceName = expectedSourceName,

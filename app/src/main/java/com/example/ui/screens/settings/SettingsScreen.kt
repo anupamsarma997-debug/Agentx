@@ -34,9 +34,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,10 +59,13 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     viewModel: AppViewModel,
     onNavigateToMetaConnection: () -> Unit = {},
+    onNavigateToLogs: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val settings by viewModel.settings.collectAsState()
     val metaConnection by viewModel.metaConnection.collectAsState()
+    val authState by viewModel.authState.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     val scrollState = rememberScrollState()
 
     var showTimeDialog by remember { mutableStateOf(false) }
@@ -80,10 +85,86 @@ fun SettingsScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Configure safe operating windows and free-tier daily quotas.",
+            text = "Configure safe operating windows, authentication, and quotas.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        // GOOGLE ACCOUNT & AUTHENTICATION Section
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_auth_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "GOOGLE & FIREBASE ACCOUNT",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (currentUser != null) Color(0xFFDCFCE7) else MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = if (currentUser != null) "Signed In" else "Local / Guest",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (currentUser != null) Color(0xFF166534) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                if (currentUser != null) {
+                    val u = currentUser!!
+                    Text(
+                        text = u.displayName ?: "Authenticated User",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = u.email ?: u.uid,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.signOutGoogle() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_google_sign_out")
+                    ) {
+                        Text("Sign Out")
+                    }
+                } else {
+                    Text(
+                        text = "Sign in with Google to synchronize your publishing schedules and connect with Firebase services.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Button(
+                        onClick = { viewModel.signInWithGoogle() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_google_sign_in")
+                    ) {
+                        Icon(Icons.Default.Language, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sign In with Google")
+                    }
+                }
+            }
+        }
 
         // META SOCIAL ACCOUNTS Section
         Card(
@@ -123,6 +204,55 @@ fun SettingsScreen(
                     Icon(Icons.Default.Public, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Facebook Page + Instagram")
+                }
+            }
+        }
+
+        // DIAGNOSTIC LOGS Section
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_logs_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "DIAGNOSTIC LOGS & AUDIT",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Inspect on-device execution events, API errors, and network diagnostics. Secrets are automatically redacted.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onNavigateToLogs,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_open_diagnostic_logs"),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.ChevronRight, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("View Application Logs")
                 }
             }
         }

@@ -9,13 +9,15 @@ import com.example.data.model.content.ContentType
 import com.example.data.model.content.GenerationStatus
 import com.example.domain.engine.ContentCreationEngine
 import com.example.domain.engine.ContentCreationOutcome
+import com.example.domain.generator.PostImageGenerator
 import com.example.domain.model.SourceFact
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 
 class ContentRepository(
     private val contentDao: ContentDao,
-    private val creationEngine: ContentCreationEngine
+    private val creationEngine: ContentCreationEngine,
+    private val postImageGenerator: PostImageGenerator? = null
 ) {
 
     fun observeContentQueue(): Flow<List<ContentEntity>> = contentDao.getAllContent()
@@ -77,6 +79,16 @@ class ContentRepository(
 
         if (outcome is ContentCreationOutcome.Success) {
             val contentId = UUID.randomUUID().toString()
+            val generatedImagePath = postImageGenerator?.generatePostBanner(
+                contentId = contentId,
+                title = outcome.result.title,
+                category = opportunity.category,
+                organization = opportunity.organization ?: outcome.result.sourceName,
+                deadline = opportunity.deadline,
+                sourceUrl = outcome.result.sourceUrl,
+                region = opportunity.region
+            )
+
             val entity = ContentEntity(
                 id = contentId,
                 sourceOpportunityId = opportunity.id,
@@ -93,7 +105,8 @@ class ContentRepository(
                 generationStatus = outcome.initialStatus.name,
                 verificationStatus = opportunity.verificationStatus,
                 aiModel = "gemini-2.5-flash",
-                errorMessage = null
+                errorMessage = null,
+                imageUrl = generatedImagePath
             )
             contentDao.insertContent(entity)
         }

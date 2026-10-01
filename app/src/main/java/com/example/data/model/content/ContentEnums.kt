@@ -31,17 +31,28 @@ enum class ContentPlatform(val displayName: String) {
 
 enum class GenerationStatus(val displayName: String) {
     DRAFT("Draft"),
-    GENERATING("Generating"),
-    GENERATED("Generated"),
-    FAILED("Failed"),
-    REVIEW_REQUIRED("Review Required"),
+    NEEDS_REVIEW("Needs Review"),
+    REVIEW_REQUIRED("Needs Review"),
     APPROVED("Approved"),
     REJECTED("Rejected"),
-    PUBLISHED("Published"); // Only for future publishing phases
+    PUBLISHING("Publishing"),
+    PUBLISHED("Published"),
+    FAILED("Failed"),
+    GENERATED("Draft"),
+    GENERATING("Generating");
 
     companion object {
         fun fromString(value: String): GenerationStatus {
-            return entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: DRAFT
+            return when (value.uppercase()) {
+                "DRAFT", "GENERATED" -> DRAFT
+                "NEEDS_REVIEW", "REVIEW_REQUIRED" -> NEEDS_REVIEW
+                "APPROVED" -> APPROVED
+                "REJECTED" -> REJECTED
+                "PUBLISHING" -> PUBLISHING
+                "PUBLISHED" -> PUBLISHED
+                "FAILED" -> FAILED
+                else -> entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: DRAFT
+            }
         }
     }
 }

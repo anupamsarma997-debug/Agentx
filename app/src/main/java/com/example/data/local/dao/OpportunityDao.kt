@@ -35,6 +35,9 @@ interface OpportunityDao {
     @Query("SELECT * FROM opportunities WHERE verificationStatus = :status ORDER BY discoveredAt DESC LIMIT :limit")
     fun getOpportunitiesByVerificationStatus(status: String, limit: Int = 100): Flow<List<OpportunityEntity>>
 
+    @Query("SELECT * FROM opportunities WHERE verificationStatus = :status ORDER BY discoveredAt DESC LIMIT :limit")
+    suspend fun getOpportunitiesByVerificationStatusSync(status: String, limit: Int = 20): List<OpportunityEntity>
+
     @Query("SELECT * FROM opportunities WHERE id = :id LIMIT 1")
     fun getOpportunityById(id: String): Flow<OpportunityEntity?>
 

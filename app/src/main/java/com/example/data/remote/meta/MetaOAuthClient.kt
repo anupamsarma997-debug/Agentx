@@ -2,10 +2,12 @@ package com.example.data.remote.meta
 
 import android.net.Uri
 import com.example.BuildConfig
+import com.example.data.local.logging.AppLogger
 import com.example.data.local.security.SecureTokenStore
 import com.example.data.model.meta.FacebookPageInfo
 import com.example.data.model.meta.InstagramAccountInfo
 import com.example.data.model.meta.InstagramAccountType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -233,7 +235,14 @@ class MetaOAuthClient(
             }
             Result.success(pages)
         } catch (e: Exception) {
-            Result.failure(Exception("Network error connecting to Meta Graph API: ${e.localizedMessage ?: "Unknown error"}"))
+            if (e is CancellationException) throw e
+            AppLogger.error("Meta", "FetchPages", "Error fetching pages", e)
+            val msg = if (e.message?.contains("Unable to resolve host", ignoreCase = true) == true) {
+                "Internet connection nahi hai. Please check your network connection."
+            } else {
+                "Network error connecting to Meta Graph API: ${e.localizedMessage ?: "Unknown error"}"
+            }
+            Result.failure(Exception(msg))
         } finally {
             conn?.disconnect()
         }
@@ -397,8 +406,14 @@ class MetaOAuthClient(
 
             Result.success(fbPage to ig)
         } catch (e: Exception) {
-            android.util.Log.e("MetaOAuthClient", "Exception during token validation", e)
-            Result.failure(Exception("Error validating token: ${e.localizedMessage ?: "Network error"}"))
+            if (e is CancellationException) throw e
+            AppLogger.error("Meta", "TokenValidation", "Exception during token validation", e)
+            val msg = if (e.message?.contains("Unable to resolve host", ignoreCase = true) == true) {
+                "Internet connection nahi hai. Please check your network connection."
+            } else {
+                "Error validating token: ${e.localizedMessage ?: "Network error"}"
+            }
+            Result.failure(Exception(msg))
         } finally {
             conn?.disconnect()
         }
@@ -410,16 +425,17 @@ class MetaOAuthClient(
     fun storePageTokenSafely(pageId: String, pageToken: String) {
         val key = "${TOKEN_KEY_PAGE_ACCESS}_$pageId"
         tokenStore.saveToken(key, pageToken)
+        tokenStore.saveToken(TOKEN_KEY_PAGE_ACCESS, pageToken)
     }
 
     fun getPageToken(pageId: String): String? {
         val key = "${TOKEN_KEY_PAGE_ACCESS}_$pageId"
-        return tokenStore.getToken(key)
+        return tokenStore.getToken(key) ?: tokenStore.getToken(TOKEN_KEY_PAGE_ACCESS)
     }
 
     fun hasPageToken(pageId: String): Boolean {
         val key = "${TOKEN_KEY_PAGE_ACCESS}_$pageId"
-        return tokenStore.hasToken(key)
+        return tokenStore.hasToken(key) || tokenStore.hasToken(TOKEN_KEY_PAGE_ACCESS)
     }
 
     fun clearTokens() {

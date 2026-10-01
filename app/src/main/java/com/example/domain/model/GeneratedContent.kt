@@ -45,6 +45,7 @@ data class GeneratedContentResult(
     val sourceName: String,
     val contentType: ContentType,
     val platform: ContentPlatform,
+    val imageUrl: String? = null,
     val confidence: String = "HIGH",
     val needsReview: Boolean = false,
     val rawJson: String? = null

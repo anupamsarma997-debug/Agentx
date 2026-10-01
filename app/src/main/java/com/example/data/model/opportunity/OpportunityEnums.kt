@@ -46,6 +46,7 @@ enum class VerificationStatus(val displayName: String) {
     VERIFIED("Verified"),
     NEEDS_REVIEW("Needs Review"),
     EXPIRED("Expired"),
+    FAILED("Failed"),
     REJECTED("Rejected");
 
     companion object {

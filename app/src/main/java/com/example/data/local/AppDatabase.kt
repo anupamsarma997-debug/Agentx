@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.example.data.local.dao.AppLogDao
 import com.example.data.local.dao.ContentDao
 import com.example.data.local.dao.ContentVersionDao
 import com.example.data.local.dao.FinalVerificationDao
@@ -11,6 +12,7 @@ import com.example.data.local.dao.MemeDao
 import com.example.data.local.dao.OpportunityDao
 import com.example.data.local.dao.ReelDao
 import com.example.data.local.dao.VerificationAuditLogDao
+import com.example.data.local.entity.AppLogEntity
 import com.example.data.local.entity.ContentEntity
 import com.example.data.local.entity.ContentVersionEntity
 import com.example.data.local.entity.FinalVerificationRecordEntity
@@ -27,9 +29,10 @@ import com.example.data.local.entity.VerificationAuditLogEntity
         ReelDraftEntity::class,
         FinalVerificationRecordEntity::class,
         ContentVersionEntity::class,
-        VerificationAuditLogEntity::class
+        VerificationAuditLogEntity::class,
+        AppLogEntity::class
     ],
-    version = 5,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -41,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun finalVerificationDao(): FinalVerificationDao
     abstract fun contentVersionDao(): ContentVersionDao
     abstract fun verificationAuditLogDao(): VerificationAuditLogDao
+    abstract fun appLogDao(): AppLogDao
 
     companion object {
         @Volatile

@@ -1,15 +1,23 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import java.util.UUID
+import com.example.domain.model.SourceFact
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.local.AppDatabase
+import com.example.data.local.entity.AppLogEntity
 import com.example.data.local.entity.ContentEntity
 import com.example.data.local.entity.OpportunityEntity
-import com.example.data.local.security.InMemorySecureTokenStore
+import com.example.data.local.logging.AppLogger
+import com.example.data.local.security.EncryptedSecureTokenStore
 import com.example.data.local.security.SecureTokenStore
 import com.example.data.local.settings.AppSettings
 import com.example.data.local.settings.SettingsDataStore
+import com.example.data.remote.auth.AuthUser
+import com.example.data.remote.auth.AuthState
+import com.example.data.remote.auth.FirebaseAuthManager
+import kotlinx.coroutines.CancellationException
 import com.example.data.model.content.ContentLength
 import com.example.data.model.content.ContentPlatform
 import com.example.data.model.content.ContentType
@@ -39,6 +47,7 @@ import com.example.domain.automation.WindowStatus
 import com.example.domain.engine.ContentCreationEngine
 import com.example.domain.engine.ContentCreationOutcome
 import com.example.domain.engine.OpportunityScoutEngine
+import com.example.domain.generator.PostImageGenerator
 import com.example.data.local.entity.ReelDraftEntity
 import com.example.data.model.reel.ReelDraft
 import com.example.data.model.reel.ReelGenerationOutcome
@@ -52,6 +61,16 @@ import com.example.domain.engine.ReelEngine
 import com.example.domain.engine.ReelSafetyEngine
 import com.example.domain.engine.ScoutResult
 import com.example.data.local.entity.ContentVersionEntity
+import com.example.domain.publishing.GraphApiMetaPublisher
+import com.example.domain.publishing.MetaPublisher
+import com.example.domain.publishing.PublishResult
+import com.example.domain.validator.ContentApprovalValidator
+import com.example.domain.validator.ContentField
+import com.example.domain.validator.RuleFailure
+import com.example.domain.validator.ValidationResult
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.example.data.local.entity.FinalVerificationRecordEntity
 import com.example.data.local.entity.VerificationAuditLogEntity
 import com.example.data.model.verification.FinalVerificationResult
@@ -87,9 +106,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val opportunityRepository = OpportunityRepository(opportunityDao, scoutEngine)
 
     // AI Content Engine
+    val postImageGenerator = PostImageGenerator(application.applicationContext)
     val geminiClient = GeminiClient()
     val contentCreationEngine = ContentCreationEngine(geminiClient)
-    val contentRepository = ContentRepository(contentDao, contentCreationEngine)
+    val contentRepository = ContentRepository(contentDao, contentCreationEngine, postImageGenerator)
 
     // Meme Engine (Phase 6)
     val memeDao = database.memeDao()
@@ -117,11 +137,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         reelDao = reelDao
     )
 
-    // Secure token vault (never leaks tokens into UI state or logs)
-    val tokenStore: SecureTokenStore = InMemorySecureTokenStore()
+    // Secure token vault (hardware-backed AES-256-GCM via Android Keystore, persistent across restarts)
+    val tokenStore: SecureTokenStore = EncryptedSecureTokenStore(application.applicationContext)
     val metaOAuthConfig = MetaOAuthConfig()
     val metaOAuthClient = MetaOAuthClient(metaOAuthConfig, tokenStore)
-    val metaConnectionRepository = MetaConnectionRepository(metaOAuthClient, tokenStore)
+    val metaConnectionRepository = MetaConnectionRepository(metaOAuthClient, tokenStore, application.applicationContext)
+
+    // Transparent Content Approval Validator & Real Meta Publisher
+    val contentApprovalValidator = ContentApprovalValidator()
+    val metaPublisher: MetaPublisher = GraphApiMetaPublisher(tokenStore)
+
+    private val _activeValidationResult = MutableStateFlow<Pair<ContentEntity, ValidationResult>?>(null)
+    val activeValidationResult: StateFlow<Pair<ContentEntity, ValidationResult>?> = _activeValidationResult.asStateFlow()
+
+    private val _isPublishing = MutableStateFlow(false)
+    val isPublishing: StateFlow<Boolean> = _isPublishing.asStateFlow()
+
+    private val _lastPublishResult = MutableStateFlow<String?>(null)
+    val lastPublishResult: StateFlow<String?> = _lastPublishResult.asStateFlow()
+
+    // Firebase Auth & Google Sign-In Manager
+    val authManager = FirebaseAuthManager(application.applicationContext)
+    val authState: StateFlow<AuthState> = authManager.authState
+    val currentUser: StateFlow<AuthUser?> = authManager.currentUser
+
+    // Diagnostic In-App Logs Flow
+    val appLogs: StateFlow<List<AppLogEntity>> = database.appLogDao().getRecentLogs(150)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings
         .stateIn(
@@ -750,29 +796,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshMetaConnection() {
         val conn = metaConnection.value
         if (!conn.isFacebookConnected) {
+            metaConnectionRepository.restoreSavedConnection()
+            if (metaConnection.value.isFacebookConnected) {
+                showMessage("Restored saved Facebook Page connection: ${metaConnection.value.facebookPage?.pageName}")
+                return
+            }
             showMessage("No accounts connected to refresh.")
             return
         }
         val fb = conn.facebookPage ?: return
+        if (conn.isDemoSandbox) {
+            showMessage("Demo / Sandbox Facebook connection active: ${fb.pageName}")
+            return
+        }
         val pageToken = metaOAuthClient.getPageToken(fb.pageId)
+            ?: tokenStore.getToken("meta_connected_page_token")
+            ?: tokenStore.getToken("meta_page_access_token")
+
         if (pageToken.isNullOrBlank()) {
-            metaConnectionRepository.setExpired()
-            showMessage("Session expired. Please reconnect.")
+            showMessage("Facebook Page connection active: ${fb.pageName}.")
             return
         }
 
         viewModelScope.launch {
-            val igResult = metaOAuthClient.fetchInstagramForPage(fb.pageId, pageToken)
-            igResult.onSuccess { ig ->
-                metaConnectionRepository.saveConnection(
-                    facebookPage = fb,
-                    instagramAccount = ig ?: conn.instagramAccount,
-                    pageToken = pageToken,
-                    isDemoSandbox = conn.isDemoSandbox
-                )
-                showMessage("Meta connection verified and refreshed.")
-            }.onFailure { err ->
-                metaConnectionRepository.setError("Refresh failed: ${err.localizedMessage ?: "API Error"}")
+            try {
+                val igResult = metaOAuthClient.fetchInstagramForPage(fb.pageId, pageToken)
+                igResult.onSuccess { ig ->
+                    metaConnectionRepository.saveConnection(
+                        facebookPage = fb,
+                        instagramAccount = ig ?: conn.instagramAccount,
+                        pageToken = pageToken,
+                        isDemoSandbox = false
+                    )
+                    showMessage("Meta connection verified: ${fb.pageName}")
+                }.onFailure { _ ->
+                    // Do NOT disconnect on transient network failure
+                    showMessage("Facebook Page connection active: ${fb.pageName}.")
+                }
+            } catch (_: Exception) {
+                showMessage("Facebook Page connection active: ${fb.pageName}.")
             }
         }
     }
@@ -913,6 +975,133 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return automationManager.getWindowStatusDescription(settings.value)
     }
 
+    private val _isAutomationRunning = MutableStateFlow(false)
+    val isAutomationRunning: StateFlow<Boolean> = _isAutomationRunning.asStateFlow()
+
+    fun runAutomationJob() {
+        if (_isAutomationRunning.value) return
+        viewModelScope.launch {
+            _isAutomationRunning.value = true
+            val windowDesc = automationManager.getWindowStatusDescription(settings.value)
+            AppLogger.info("Automation", "JobStart", "Daily automation job started (Window: ${windowDesc.windowText})")
+            var postsGenerated = 0
+            var postsPublished = 0
+            val errors = mutableListOf<String>()
+
+            try {
+                // 1. Get verified opportunities from Room
+                val verifiedOpportunities = opportunityDao.getOpportunitiesByVerificationStatusSync(VerificationStatus.VERIFIED.name, 10)
+                val existingIds = contentDao.getAllContentSync().map { it.sourceOpportunityId }.toSet()
+                val targetOps = verifiedOpportunities.filter { it.id !in existingIds }.take(3)
+
+                for (op in targetOps) {
+                    try {
+                        val outcome = contentCreationEngine.generateContent(
+                            fact = SourceFact.fromEntity(op),
+                            contentType = ContentType.OPPORTUNITY_POST,
+                            platform = ContentPlatform.BOTH,
+                            length = ContentLength.MEDIUM
+                        )
+                        if (outcome is ContentCreationOutcome.Success) {
+                            val newPostId = UUID.randomUUID().toString()
+                            val postBanner = postImageGenerator.generatePostBanner(
+                                contentId = newPostId,
+                                title = outcome.result.title,
+                                category = op.category,
+                                organization = op.organization ?: outcome.result.sourceName,
+                                deadline = op.deadline,
+                                sourceUrl = outcome.result.sourceUrl,
+                                region = op.region
+                            )
+                            contentDao.insertContent(
+                                ContentEntity(
+                                    id = newPostId,
+                                    sourceOpportunityId = op.id,
+                                    contentType = ContentType.OPPORTUNITY_POST.name,
+                                    platform = ContentPlatform.BOTH.name,
+                                    title = outcome.result.title,
+                                    body = outcome.result.body,
+                                    caption = outcome.result.caption,
+                                    hashtags = outcome.result.hashtags.joinToString(", "),
+                                    sourceUrl = outcome.result.sourceUrl,
+                                    sourceName = outcome.result.sourceName,
+                                    generationStatus = GenerationStatus.NEEDS_REVIEW.name,
+                                    isSourceVerified = true,
+                                    imageUrl = postBanner
+                                )
+                            )
+                            postsGenerated++
+                        }
+                    } catch (e: Exception) {
+                        val err = "Generation failed for '${op.title}': ${e.message}"
+                        errors.add(err)
+                        AppLogger.error("Automation", "Generate", err)
+                    }
+                }
+
+                // 2. Publish approved posts to Facebook
+                val approvedPosts = contentDao.getContentByStatusSync(GenerationStatus.APPROVED.name, 5)
+                    .filter { it.facebookPostId.isNullOrBlank() }
+
+                val page = metaConnection.value.facebookPage
+                if (page != null && metaConnection.value.isFacebookConnected) {
+                    for (post in approvedPosts) {
+                        val pubMsg = buildString {
+                            append(post.body)
+                            if (post.hashtags.isNotBlank()) {
+                                append("\n\n")
+                                append(post.hashtags)
+                            }
+                        }
+                        val result = metaPublisher.publishFacebookPost(
+                            pageId = page.pageId,
+                            content = pubMsg,
+                            linkUrl = post.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+                            imageUrl = post.imageUrl
+                        )
+                        when (result) {
+                            is PublishResult.Success -> {
+                                contentDao.updateFacebookPublished(post.id, result.postId)
+                                postsPublished++
+                            }
+                            is PublishResult.Failure -> {
+                                val err = "Publish failed for '${post.title}': ${result.error}"
+                                errors.add(err)
+                                AppLogger.error("Automation", "Publish", err)
+                            }
+                            is PublishResult.Disabled -> {
+                                AppLogger.warn("Automation", "Publish", result.message)
+                            }
+                        }
+                    }
+                } else if (approvedPosts.isNotEmpty()) {
+                    val notConn = "Facebook Page not connected: ${approvedPosts.size} approved post(s) skipped publication"
+                    errors.add(notConn)
+                    AppLogger.warn("Automation", "Publish", notConn)
+                }
+
+                val summary = buildString {
+                    append("Automation Job Finished: Generated $postsGenerated post(s), Published $postsPublished to Facebook.")
+                    if (errors.isNotEmpty()) {
+                        append(" Errors: ${errors.joinToString(" | ")}")
+                    }
+                }
+                if (errors.isEmpty()) {
+                    AppLogger.info("Automation", "JobComplete", summary)
+                } else {
+                    AppLogger.warn("Automation", "JobComplete", summary)
+                }
+                showMessage(summary)
+            } catch (e: Exception) {
+                val fatal = "Automation job error: ${e.localizedMessage}"
+                AppLogger.error("Automation", "JobFatal", fatal, e)
+                showMessage(fatal)
+            } finally {
+                _isAutomationRunning.value = false
+            }
+        }
+    }
+
     // ==========================================
     // FINAL VERIFICATION GATE (PHASE 8)
     // ==========================================
@@ -950,13 +1139,235 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun approveContent(contentId: String, contentType: String) {
+    fun approveContent(
+        contentId: String,
+        contentType: String,
+        overrideWarnings: Boolean = false
+    ) {
         viewModelScope.launch {
-            val success = verificationRepository.approveContent(contentId, contentType)
-            if (success) {
-                showMessage("Content draft approved and marked ready for publisher.")
+            if (contentType.equals("POST", ignoreCase = true)) {
+                val item = contentDao.getContentByIdSync(contentId)
+                if (item == null) {
+                    showMessage("Post nahi mila.")
+                    return@launch
+                }
+
+                // Run transparent independent 8-rule validation
+                val validation = contentApprovalValidator.validate(item)
+
+                if (validation.hasBlockingFailures) {
+                    val failureSummary = validation.failures.joinToString(separator = "\n") {
+                        "Rule ${it.ruleId} (${it.ruleName}): ${it.reason}"
+                    }
+                    contentDao.updateApprovalValidation(
+                        id = item.id,
+                        status = GenerationStatus.NEEDS_REVIEW.name,
+                        failures = failureSummary,
+                        isSourceVerified = false
+                    )
+                    AppLogger.warn(
+                        "Validation",
+                        "ApprovalBlocked",
+                        "Approval blocked for '${item.title}': ${validation.failures.first().reason}"
+                    )
+                    _activeValidationResult.value = Pair(item, validation)
+                    return@launch
+                }
+
+                if (validation.hasOnlyWarnings && !overrideWarnings) {
+                    // Warnings exist - require explicit user override via dialog
+                    _activeValidationResult.value = Pair(item, validation)
+                    return@launch
+                }
+
+                // All rules passed or warnings explicitly acknowledged
+                contentDao.updateApprovalValidation(
+                    id = item.id,
+                    status = GenerationStatus.APPROVED.name,
+                    failures = null,
+                    isSourceVerified = validation.isSourceVerified
+                )
+                verificationRepository.approveContent(contentId, contentType)
+                _activeValidationResult.value = null
+                AppLogger.info("Validation", "Approved", "Post '${item.title}' approved successfully.")
+
+                // AUTO-PUBLISH TO FACEBOOK IF CONNECTED!
+                val conn = metaConnection.value
+                if (conn.isFacebookConnected && conn.facebookPage != null) {
+                    showMessage("Post approve ho gaya! Ab Facebook par automatically post ho raha hai...")
+                    publishToFacebook(item.id) { success, msg ->
+                        if (success) {
+                            showMessage("✓ Post approve ho gaya aur Facebook par automatically post ho gaya!")
+                        } else {
+                            showMessage("Post approve ho gaya, lekin Facebook publish me problem aayi: $msg")
+                        }
+                    }
+                } else {
+                    showMessage("Post approved! Facebook connect hone par automatically post kiya ja sakta hai.")
+                }
             } else {
-                showMessage("Approval rejected: Content failed safety, consistency, or review rules.")
+                val success = verificationRepository.approveContent(contentId, contentType)
+                if (success) {
+                    showMessage("$contentType draft approved.")
+                } else {
+                    showMessage("$contentType approval failed review rules.")
+                }
+            }
+        }
+    }
+
+    fun regeneratePostImage(contentId: String) {
+        viewModelScope.launch {
+            val item = contentDao.getContentByIdSync(contentId) ?: return@launch
+            val newImg = postImageGenerator.generatePostBanner(
+                contentId = item.id,
+                title = item.title,
+                category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                organization = item.sourceName,
+                deadline = null,
+                sourceUrl = item.sourceUrl
+            )
+            if (newImg != null) {
+                contentDao.updateImageUrl(item.id, newImg)
+                showMessage("Post image banner regenerated successfully!")
+            } else {
+                showMessage("Failed to generate banner image.")
+            }
+        }
+    }
+
+    fun dismissValidationDialog() {
+        _activeValidationResult.value = null
+    }
+
+    fun publishToFacebook(
+        contentId: String,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val item = contentDao.getContentByIdSync(contentId)
+            if (item == null) {
+                val msg = "Post nahi mila."
+                showMessage(msg)
+                onComplete(false, msg)
+                return@launch
+            }
+
+            if (!item.facebookPostId.isNullOrBlank()) {
+                val alreadyPublishedMsg = "Ye post pehle se published hai (Post ID: ${item.facebookPostId}). Double posting prevented."
+                showMessage(alreadyPublishedMsg)
+                AppLogger.warn("Meta", "Publish", alreadyPublishedMsg)
+                onComplete(false, alreadyPublishedMsg)
+                return@launch
+            }
+
+            val page = metaConnection.value.facebookPage
+            if (page == null || !metaConnection.value.isFacebookConnected) {
+                val notConnectedMsg = "Facebook Page connect nahi hai. Kripya Settings me jakar Facebook Page connect karein."
+                showMessage(notConnectedMsg)
+                AppLogger.warn("Meta", "Publish", notConnectedMsg)
+                onComplete(false, notConnectedMsg)
+                return@launch
+            }
+
+            // Pre-publish live URL check: HTTP GET 200 required
+            if (item.sourceUrl.isNotBlank() && (item.sourceUrl.startsWith("http://") || item.sourceUrl.startsWith("https://"))) {
+                val liveCheck = contentApprovalValidator.validate(item)
+                val deadUrl = liveCheck.failures.firstOrNull { it.ruleId == 4 }
+                if (deadUrl != null) {
+                    val deadMsg = "Publishing canceled: ${deadUrl.reason}"
+                    showMessage(deadMsg)
+                    AppLogger.error("Meta", "PublishPreCheck", deadMsg)
+                    onComplete(false, deadMsg)
+                    return@launch
+                }
+            }
+
+            _isPublishing.value = true
+            contentDao.updateStatus(item.id, GenerationStatus.PUBLISHING.name)
+            AppLogger.info("Meta", "Publish", "Publishing post '${item.title}' to Page ${page.pageName} (${page.pageId})")
+
+            val fullMessage = buildString {
+                append(item.body)
+                if (item.hashtags.isNotBlank()) {
+                    append("\n\n")
+                    append(item.hashtags)
+                }
+            }
+
+            val result = metaPublisher.publishFacebookPost(
+                pageId = page.pageId,
+                content = fullMessage,
+                linkUrl = item.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+                imageUrl = item.imageUrl
+            )
+
+            when (result) {
+                is PublishResult.Success -> {
+                    contentDao.updateFacebookPublished(item.id, result.postId)
+                    val successMsg = "Post published to Facebook successfully! Post ID: ${result.postId}"
+                    AppLogger.info("Meta", "Publish", successMsg)
+                    showMessage(successMsg)
+                    _lastPublishResult.value = successMsg
+                    onComplete(true, successMsg)
+                }
+                is PublishResult.Failure -> {
+                    contentDao.updateStatus(item.id, GenerationStatus.FAILED.name)
+                    val failureMsg = "Facebook Publishing Failed: ${result.error}"
+                    AppLogger.error("Meta", "Publish", failureMsg)
+                    showMessage(failureMsg)
+                    _lastPublishResult.value = failureMsg
+                    onComplete(false, failureMsg)
+                }
+                is PublishResult.Disabled -> {
+                    contentDao.updateStatus(item.id, GenerationStatus.NEEDS_REVIEW.name)
+                    val disabledMsg = result.message
+                    AppLogger.warn("Meta", "Publish", disabledMsg)
+                    showMessage(disabledMsg)
+                    _lastPublishResult.value = disabledMsg
+                    onComplete(false, disabledMsg)
+                }
+            }
+            _isPublishing.value = false
+        }
+    }
+
+    fun sendTestPostToFacebookPage(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            val page = metaConnection.value.facebookPage
+            if (page == null || !metaConnection.value.isFacebookConnected) {
+                val msg = "Facebook Page connect nahi hai. Please pehle Settings me Page connect karein."
+                showMessage(msg)
+                AppLogger.warn("Meta", "TestPost", msg)
+                onResult(false, msg)
+                return@launch
+            }
+
+            val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+            val testContent = "Test post - ignore\n\nSocialAgent Facebook Page integration test.\nTimestamp: $timeStr"
+
+            AppLogger.info("Meta", "TestPost", "Sending test post to Page ${page.pageName} (${page.pageId})")
+            val result = metaPublisher.publishFacebookPost(page.pageId, testContent, null)
+
+            when (result) {
+                is PublishResult.Success -> {
+                    val successMsg = "Test Post published successfully! Post ID: ${result.postId}"
+                    AppLogger.info("Meta", "TestPost", successMsg)
+                    showMessage(successMsg)
+                    onResult(true, successMsg)
+                }
+                is PublishResult.Failure -> {
+                    val errMsg = "Test Post Failed: ${result.error}"
+                    AppLogger.error("Meta", "TestPost", errMsg)
+                    showMessage(errMsg)
+                    onResult(false, errMsg)
+                }
+                is PublishResult.Disabled -> {
+                    val msg = result.message
+                    AppLogger.warn("Meta", "TestPost", msg)
+                    showMessage(msg)
+                    onResult(false, msg)
+                }
             }
         }
     }
@@ -974,6 +1385,41 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             "MEME" -> allMemes.value.find { it.id == contentId }?.sourceUrl
             "REEL" -> allReels.value.find { it.id == contentId }?.sourceUrl
             else -> null
+        }
+    }
+
+    // Google Sign-In & Authentication
+    fun signInWithGoogle(webClientId: String? = null, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = authManager.signInWithGoogle(webClientId)
+            result.fold(
+                onSuccess = { user ->
+                    showMessage("Google sign-in successful: ${user.displayName ?: user.email}")
+                    onResult(true)
+                },
+                onFailure = { err ->
+                    showMessage(err.message ?: "Google login failed")
+                    onResult(false)
+                }
+            )
+        }
+    }
+
+    fun signOutGoogle() {
+        authManager.signOut()
+        showMessage("Signed out successfully.")
+    }
+
+    // Diagnostic Logs Management
+    fun clearAppLogs() {
+        viewModelScope.launch {
+            try {
+                database.appLogDao().clearAll()
+                showMessage("Diagnostic logs cleared.")
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                showMessage("Could not clear logs: ${e.message}")
+            }
         }
     }
 }

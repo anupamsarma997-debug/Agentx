@@ -25,7 +25,9 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.SentimentVerySatisfied
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.TrendingUp
@@ -35,6 +37,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -322,6 +325,36 @@ fun DashboardScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val isAutoRunning by viewModel.isAutomationRunning.collectAsState()
+                Button(
+                    onClick = { viewModel.runAutomationJob() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_run_automation_job"),
+                    enabled = !isAutoRunning,
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isAutoRunning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Running Automation Job...")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("RUN AUTOMATION JOB NOW")
+                    }
+                }
             }
         }
 
@@ -355,18 +388,36 @@ fun DashboardScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        IconButton(
+                            onClick = { viewModel.refreshMetaConnection() },
+                            modifier = Modifier.size(28.dp).testTag("btn_dashboard_refresh_meta")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Refresh Social Connection",
+                                tint = MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+
+                    val (badgeText, badgeBg, badgeTextColor) = when {
+                        metaConnection.isFullyConnected -> Triple("CONNECTED", Color(0xFFDCFCE7), Color(0xFF166534))
+                        metaConnection.isFacebookConnected && !metaConnection.isInstagramConnected -> Triple("PARTIAL (Facebook connected)", Color(0xFFFEF3C7), Color(0xFF92400E))
+                        metaConnection.isInstagramConnected && !metaConnection.isFacebookConnected -> Triple("PARTIAL (Instagram connected)", Color(0xFFFEF3C7), Color(0xFF92400E))
+                        else -> Triple("NOT CONNECTED", Color(0xFFF3F4F6), Color(0xFF6B7280))
                     }
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (metaConnection.isFullyConnected) Color(0xFFDCFCE7) else Color(0xFFF3F4F6)
+                        color = badgeBg
                     ) {
                         Text(
-                            text = if (metaConnection.isFullyConnected) "CONNECTED" else "NOT CONNECTED",
+                            text = badgeText,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (metaConnection.isFullyConnected) Color(0xFF166534) else Color(0xFF6B7280)
+                            color = badgeTextColor
                         )
                     }
                 }
@@ -423,14 +474,32 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Button(
-                    onClick = onNavigateToMetaConnection,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("btn_manage_connections"),
-                    shape = RoundedCornerShape(10.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Manage Connections")
+                    if (metaConnection.isFacebookConnected) {
+                        OutlinedButton(
+                            onClick = { viewModel.sendTestPostToFacebookPage() },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("btn_dashboard_test_post"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Test Post")
+                        }
+                    }
+                    Button(
+                        onClick = onNavigateToMetaConnection,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_manage_connections"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Manage")
+                    }
                 }
             }
         }

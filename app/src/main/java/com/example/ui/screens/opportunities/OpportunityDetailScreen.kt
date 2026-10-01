@@ -339,6 +339,7 @@ fun VerificationBadge(status: VerificationStatus, modifier: Modifier = Modifier)
         VerificationStatus.VERIFIED -> Triple(Color(0xFFDCFCE7), Color(0xFF166534), "VERIFIED")
         VerificationStatus.NEEDS_REVIEW -> Triple(Color(0xFFFEF3C7), Color(0xFF92400E), "NEEDS REVIEW")
         VerificationStatus.EXPIRED -> Triple(Color(0xFFFEE2E2), Color(0xFF991B1B), "EXPIRED")
+        VerificationStatus.FAILED -> Triple(Color(0xFFFEE2E2), Color(0xFF991B1B), "FAILED")
         VerificationStatus.REJECTED -> Triple(Color(0xFFF3F4F6), Color(0xFF374151), "REJECTED")
     }
 

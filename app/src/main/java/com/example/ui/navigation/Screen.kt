@@ -90,6 +90,13 @@ sealed class Screen(
         fun createRoute(contentId: String, contentType: String): String = "final_verification/$contentId/$contentType"
     }
 
+    data object Logs : Screen(
+        route = "logs",
+        title = "Diagnostic Logs",
+        selectedIcon = Icons.Filled.Settings,
+        unselectedIcon = Icons.Outlined.Settings
+    )
+
     companion object {
         val bottomNavItems = listOf(
             Dashboard,

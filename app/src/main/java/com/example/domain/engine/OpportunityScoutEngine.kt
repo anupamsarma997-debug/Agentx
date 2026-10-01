@@ -110,6 +110,9 @@ class OpportunityScoutEngine(
                         VerificationStatus.VERIFIED -> totalVerified++
                         VerificationStatus.NEEDS_REVIEW -> totalNeedsReview++
                         VerificationStatus.EXPIRED -> totalExpired++
+                        VerificationStatus.FAILED -> {
+                            // Dead/failed link - persisted so UI displays Failed badge
+                        }
                         VerificationStatus.REJECTED -> {
                             totalRejected++
                             continue // Do not persist rejected items

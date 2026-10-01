@@ -13,6 +13,7 @@ import com.example.ui.screens.opportunities.OpportunitiesScreen
 import com.example.ui.screens.opportunities.OpportunityDetailScreen
 import com.example.ui.screens.queue.ContentPreviewScreen
 import com.example.ui.screens.queue.ContentQueueScreen
+import com.example.ui.screens.settings.LogsScreen
 import com.example.ui.screens.settings.MetaConnectionScreen
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.verification.FinalVerificationScreen
@@ -101,11 +102,22 @@ fun AppNavHost(
                 viewModel = viewModel,
                 onNavigateToMetaConnection = {
                     navController.navigate(Screen.MetaConnection.route)
+                },
+                onNavigateToLogs = {
+                    navController.navigate(Screen.Logs.route)
                 }
             )
         }
         composable(route = Screen.MetaConnection.route) {
             MetaConnectionScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        composable(route = Screen.Logs.route) {
+            LogsScreen(
                 viewModel = viewModel,
                 onNavigateBack = {
                     navController.popBackStack()
