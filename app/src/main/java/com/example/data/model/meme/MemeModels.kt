@@ -17,7 +17,9 @@ enum class MemeFormat(val displayName: String, val description: String) {
     ASSAM_RELATABLE("Assam Relatable", "Wholesome, hyper-relatable everyday Assam & Northeast life"),
     JOB_RELATABLE("Job Relatable", "Job hunting, resumes, interview struggles, and work life"),
     STUDENT_RELATABLE("Student Relatable", "Exams, college hostels, viva, assignments, and results"),
-    STARTUP_RELATABLE("Startup Relatable", "Founders, pitch decks, coffee, and bootstrapping humor");
+    STARTUP_RELATABLE("Startup Relatable", "Founders, pitch decks, coffee, and bootstrapping humor"),
+    NEWSBOY_CREATOR_STYLE("NewsBoy & Neon Man Style", "Fast creator updates, YouTube community buzz, and witty creator commentary"),
+    SARKARI_SCHEME_RELATABLE("Sarkari Scheme Relatable", "Middle class & student reactions to Bharat Sarkar & MSME opportunities");
 
     companion object {
         fun fromString(value: String): MemeFormat {
@@ -110,6 +112,32 @@ data class MemeTopic(
                 region = OpportunityRegion.INDIA.name,
                 sourceName = "Public General Observations",
                 sourceUrl = "https://india.gov.in",
+                verificationStatus = VerificationStatus.VERIFIED.name,
+                sourceOpportunityId = null
+            )
+        }
+
+        fun createCreatorNewsTheme(themeTitle: String, description: String): MemeTopic {
+            return MemeTopic(
+                topic = themeTitle,
+                context = description,
+                category = OpportunityCategory.NEWS.name,
+                region = OpportunityRegion.INDIA.name,
+                sourceName = "NewsBoy & Neon Man Creator Updates",
+                sourceUrl = "https://youtube.com",
+                verificationStatus = VerificationStatus.VERIFIED.name,
+                sourceOpportunityId = null
+            )
+        }
+
+        fun createSarkariSchemeTheme(themeTitle: String, description: String): MemeTopic {
+            return MemeTopic(
+                topic = themeTitle,
+                context = description,
+                category = OpportunityCategory.BUSINESS.name,
+                region = OpportunityRegion.INDIA.name,
+                sourceName = "Ministry of MSME & Bharat Sarkar",
+                sourceUrl = "https://udyamregistration.gov.in",
                 verificationStatus = VerificationStatus.VERIFIED.name,
                 sourceOpportunityId = null
             )

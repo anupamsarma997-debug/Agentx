@@ -31,6 +31,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +64,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.data.model.content.GenerationStatus
+import com.example.domain.generator.PostImageSize
 import com.example.ui.screens.opportunities.VerificationBadge
 import com.example.ui.viewmodel.AppViewModel
 import java.io.File
@@ -86,6 +88,7 @@ fun ContentPreviewScreen(
     val scrollState = rememberScrollState()
 
     var isEditing by remember { mutableStateOf(false) }
+    var selectedImageSize by remember { mutableStateOf(PostImageSize.SQUARE) }
     var editedTitle by remember(content) { mutableStateOf(content?.title ?: "") }
     var editedBody by remember(content) { mutableStateOf(content?.body ?: "") }
     var editedCaption by remember(content) { mutableStateOf(content?.caption ?: "") }
@@ -262,12 +265,39 @@ fun ContentPreviewScreen(
                                 )
                             }
                             TextButton(
-                                onClick = { viewModel.regeneratePostImage(content.id) },
+                                onClick = { viewModel.regeneratePostImage(content.id, selectedImageSize) },
                                 modifier = Modifier.testTag("btn_regenerate_banner")
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Regenerate")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Multi-size aspect ratio selector chips
+                        Text(
+                            text = "Size / Aspect Ratio: ${selectedImageSize.displayName} (${selectedImageSize.width}x${selectedImageSize.height})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            PostImageSize.entries.forEach { size ->
+                                FilterChip(
+                                    selected = selectedImageSize == size,
+                                    onClick = {
+                                        selectedImageSize = size
+                                        viewModel.regeneratePostImage(content.id, size)
+                                    },
+                                    label = { Text(size.aspectRatioLabel) },
+                                    modifier = Modifier.testTag("preview_size_chip_${size.id}")
+                                )
                             }
                         }
 
@@ -282,9 +312,9 @@ fun ContentPreviewScreen(
                                     contentDescription = "Generated Post Banner",
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(1f)
+                                        .aspectRatio(selectedImageSize.aspectFloat)
                                         .clip(RoundedCornerShape(12.dp)),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Fit
                                 )
                             } else {
                                 AsyncImage(
@@ -292,9 +322,9 @@ fun ContentPreviewScreen(
                                     contentDescription = "Generated Post Banner",
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .aspectRatio(1f)
+                                        .aspectRatio(selectedImageSize.aspectFloat)
                                         .clip(RoundedCornerShape(12.dp)),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Fit
                                 )
                             }
                         } else {
@@ -321,9 +351,10 @@ fun ContentPreviewScreen(
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Button(
-                                        onClick = { viewModel.regeneratePostImage(content.id) }
+                                        onClick = { viewModel.regeneratePostImage(content.id, selectedImageSize) },
+                                        modifier = Modifier.testTag("btn_generate_banner_empty")
                                     ) {
-                                        Text("Generate Image Banner")
+                                        Text("Generate ${selectedImageSize.displayName} Banner")
                                     }
                                 }
                             }

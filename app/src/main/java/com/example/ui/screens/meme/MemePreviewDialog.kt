@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.AlertDialog
@@ -31,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +60,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.data.local.entity.MemeDraftEntity
 import com.example.data.model.meme.MemeGenerationStatus
+import com.example.domain.generator.PostImageSize
 import com.example.data.model.meme.MemeSafetyStatus
 
 @Composable
@@ -101,9 +104,11 @@ fun MemePreviewDialog(
     onDismiss: () -> Unit,
     onApprove: () -> Unit,
     onReject: () -> Unit,
-    onSaveEdit: (setup: String, punchline: String, caption: String, hashtags: String) -> Unit
+    onSaveEdit: (setup: String, punchline: String, caption: String, hashtags: String) -> Unit,
+    onExportImage: ((PostImageSize) -> Unit)? = null
 ) {
     var isEditing by remember { mutableStateOf(false) }
+    var selectedMemeSize by remember { mutableStateOf(PostImageSize.SQUARE) }
     var editedSetup by remember(meme) { mutableStateOf(meme.setupText) }
     var editedPunchline by remember(meme) { mutableStateOf(meme.punchlineText) }
     var editedCaption by remember(meme) { mutableStateOf(meme.caption) }
@@ -306,7 +311,42 @@ fun MemePreviewDialog(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Multi-size selection for visual meme card
+                Text(
+                    text = "Meme Image Size: ${selectedMemeSize.displayName}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    PostImageSize.entries.forEach { size ->
+                        FilterChip(
+                            selected = selectedMemeSize == size,
+                            onClick = { selectedMemeSize = size },
+                            label = { Text(size.aspectRatioLabel) },
+                            modifier = Modifier.testTag("meme_size_chip_${size.id}")
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { onExportImage?.invoke(selectedMemeSize) },
+                    modifier = Modifier.fillMaxWidth().testTag("btn_export_meme_image")
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Generate ${selectedMemeSize.displayName} Image Card")
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Action Buttons
                 Row(

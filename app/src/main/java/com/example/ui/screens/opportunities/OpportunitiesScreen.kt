@@ -269,7 +269,19 @@ fun OpportunitiesScreen(
                 modifier = Modifier.testTag("filter_startup")
             )
 
-            // Category Filter: News
+            // Category Filter: MSME & Business Schemes
+            FilterChip(
+                selected = selectedCategory == OpportunityCategory.BUSINESS,
+                onClick = {
+                    viewModel.setCategoryFilter(
+                        if (selectedCategory == OpportunityCategory.BUSINESS) null else OpportunityCategory.BUSINESS
+                    )
+                },
+                label = { Text("MSME & Schemes") },
+                modifier = Modifier.testTag("filter_msme_business")
+            )
+
+            // Category Filter: News & Creator Updates
             FilterChip(
                 selected = selectedCategory == OpportunityCategory.NEWS,
                 onClick = {
@@ -277,7 +289,7 @@ fun OpportunitiesScreen(
                         if (selectedCategory == OpportunityCategory.NEWS) null else OpportunityCategory.NEWS
                     )
                 },
-                label = { Text("News") },
+                label = { Text("News & Creator Updates") },
                 modifier = Modifier.testTag("filter_news")
             )
         }

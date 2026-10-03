@@ -10,6 +10,7 @@ import com.example.data.model.content.GenerationStatus
 import com.example.domain.engine.ContentCreationEngine
 import com.example.domain.engine.ContentCreationOutcome
 import com.example.domain.generator.PostImageGenerator
+import com.example.domain.generator.PostImageSize
 import com.example.domain.model.SourceFact
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
@@ -67,7 +68,8 @@ class ContentRepository(
         opportunity: OpportunityEntity,
         contentType: ContentType = ContentType.OPPORTUNITY_POST,
         platform: ContentPlatform = ContentPlatform.BOTH,
-        length: ContentLength = ContentLength.SHORT
+        length: ContentLength = ContentLength.SHORT,
+        imageSize: PostImageSize = PostImageSize.SQUARE
     ): ContentCreationOutcome {
         val fact = SourceFact.fromEntity(opportunity)
         val outcome = creationEngine.generateContent(
@@ -86,7 +88,8 @@ class ContentRepository(
                 organization = opportunity.organization ?: outcome.result.sourceName,
                 deadline = opportunity.deadline,
                 sourceUrl = outcome.result.sourceUrl,
-                region = opportunity.region
+                region = opportunity.region,
+                size = imageSize
             )
 
             val entity = ContentEntity(

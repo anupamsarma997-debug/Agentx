@@ -180,6 +180,9 @@ fun ContentQueueScreen(
             },
             onSaveEdit = { setup, punchline, caption, hashtags ->
                 viewModel.updateMemeTexts(meme.id, setup, punchline, caption, hashtags)
+            },
+            onExportImage = { size ->
+                viewModel.exportMemeImage(meme.id, size)
             }
         )
     }

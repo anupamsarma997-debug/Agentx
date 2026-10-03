@@ -24,6 +24,10 @@ class MetaConnectionRepository(
         "social_agent_meta_connection_store",
         Context.MODE_PRIVATE
     )
+    private val legacyPrefs = context?.applicationContext?.getSharedPreferences(
+        "meta_connection_store",
+        Context.MODE_PRIVATE
+    )
 
     init {
         // 1. First restore previously connected Facebook Page and Instagram accounts from persistent storage
@@ -47,27 +51,48 @@ class MetaConnectionRepository(
             val pageId = prefs.getString("page_id", null)
             if (isConnected && !pageId.isNullOrBlank()) return true
         }
+        if (legacyPrefs != null) {
+            val isConnected = legacyPrefs.getBoolean("is_connected", false)
+            val pageId = legacyPrefs.getString("page_id", null)
+            if (isConnected && !pageId.isNullOrBlank()) return true
+        }
         val tokenPageId = tokenStore.getToken("meta_connected_page_id")
         val tokenIsConnected = tokenStore.getToken("meta_is_connected") == "true"
         return tokenIsConnected && !tokenPageId.isNullOrBlank()
     }
 
     fun restoreSavedConnection() {
-        val savedPageId = prefs?.getString("page_id", null) ?: tokenStore.getToken("meta_connected_page_id")
-        val savedPageName = prefs?.getString("page_name", null) ?: tokenStore.getToken("meta_connected_page_name")
-        val isConnected = prefs?.getBoolean("is_connected", false) ?: (tokenStore.getToken("meta_is_connected") == "true")
-        val isDemoSandbox = prefs?.getBoolean("is_demo_sandbox", false) ?: (tokenStore.getToken("meta_is_demo_sandbox") == "true")
-        val savedPageToken = prefs?.getString("page_token", null) ?: tokenStore.getToken("meta_connected_page_token")
+        val savedPageId = prefs?.getString("page_id", null)
+            ?: legacyPrefs?.getString("page_id", null)
+            ?: tokenStore.getToken("meta_connected_page_id")
+        val savedPageName = prefs?.getString("page_name", null)
+            ?: legacyPrefs?.getString("page_name", null)
+            ?: tokenStore.getToken("meta_connected_page_name")
+        val isConnected = prefs?.getBoolean("is_connected", false)
+            ?: legacyPrefs?.getBoolean("is_connected", false)
+            ?: (tokenStore.getToken("meta_is_connected") == "true")
+        val isDemoSandbox = prefs?.getBoolean("is_demo_sandbox", false)
+            ?: legacyPrefs?.getBoolean("is_demo_sandbox", false)
+            ?: (tokenStore.getToken("meta_is_demo_sandbox") == "true")
+        val savedPageToken = prefs?.getString("page_token", null)
+            ?: legacyPrefs?.getString("page_token", null)
+            ?: tokenStore.getToken("meta_connected_page_token")
+            ?: tokenStore.getToken("meta_page_access_token")
 
         if (isConnected || (!savedPageId.isNullOrBlank() && !savedPageName.isNullOrBlank())) {
             val pageId = savedPageId ?: "connected_page"
             val pageName = savedPageName ?: "Connected Facebook Page"
             val savedCategory = prefs?.getString("page_category", null)
+                ?: legacyPrefs?.getString("page_category", null)
                 ?: tokenStore.getToken("meta_connected_page_category")
                 ?: "Facebook Page"
 
-            val savedIgId = prefs?.getString("ig_id", null) ?: tokenStore.getToken("meta_connected_ig_id")
-            val savedIgUsername = prefs?.getString("ig_username", null) ?: tokenStore.getToken("meta_connected_ig_username")
+            val savedIgId = prefs?.getString("ig_id", null)
+                ?: legacyPrefs?.getString("ig_id", null)
+                ?: tokenStore.getToken("meta_connected_ig_id")
+            val savedIgUsername = prefs?.getString("ig_username", null)
+                ?: legacyPrefs?.getString("ig_username", null)
+                ?: tokenStore.getToken("meta_connected_ig_username")
             val ig = if (!savedIgId.isNullOrBlank()) {
                 InstagramAccountInfo(
                     instagramAccountId = savedIgId,
@@ -82,6 +107,8 @@ class MetaConnectionRepository(
             if (!savedPageToken.isNullOrBlank()) {
                 oauthClient.storePageTokenSafely(pageId, savedPageToken)
                 tokenStore.saveToken("meta_connected_page_token", savedPageToken)
+                tokenStore.saveToken("meta_page_access_token", savedPageToken)
+                tokenStore.saveToken("meta_page_access_token_$pageId", savedPageToken)
             }
 
             _connectionState.value = MetaConnectionState(
@@ -114,6 +141,8 @@ class MetaConnectionRepository(
         if (pageToken != null && pageToken.isNotBlank()) {
             oauthClient.storePageTokenSafely(facebookPage.pageId, pageToken)
             tokenStore.saveToken("meta_connected_page_token", pageToken)
+            tokenStore.saveToken("meta_page_access_token", pageToken)
+            tokenStore.saveToken("meta_page_access_token_${facebookPage.pageId}", pageToken)
         }
 
         // Persist to dedicated preferences with synchronous commit()
@@ -129,12 +158,27 @@ class MetaConnectionRepository(
             ?.putLong("last_connected", System.currentTimeMillis())
             ?.commit()
 
+        legacyPrefs?.edit()
+            ?.putBoolean("is_connected", true)
+            ?.putBoolean("is_demo_sandbox", isDemoSandbox)
+            ?.putString("page_id", facebookPage.pageId)
+            ?.putString("page_name", facebookPage.pageName)
+            ?.putString("page_category", facebookPage.category)
+            ?.putString("page_token", pageToken ?: "")
+            ?.putLong("last_connected", System.currentTimeMillis())
+            ?.commit()
+
         // Also persist connection metadata in tokenStore
         tokenStore.saveToken("meta_is_connected", "true")
         tokenStore.saveToken("meta_is_demo_sandbox", isDemoSandbox.toString())
         tokenStore.saveToken("meta_connected_page_id", facebookPage.pageId)
         tokenStore.saveToken("meta_connected_page_name", facebookPage.pageName)
         tokenStore.saveToken("meta_connected_page_category", facebookPage.category)
+        if (pageToken != null && pageToken.isNotBlank()) {
+            tokenStore.saveToken("meta_connected_page_token", pageToken)
+            tokenStore.saveToken("meta_page_access_token", pageToken)
+            tokenStore.saveToken("meta_page_access_token_${facebookPage.pageId}", pageToken)
+        }
         if (instagramAccount != null) {
             tokenStore.saveToken("meta_connected_ig_id", instagramAccount.instagramAccountId)
             tokenStore.saveToken("meta_connected_ig_username", instagramAccount.username)

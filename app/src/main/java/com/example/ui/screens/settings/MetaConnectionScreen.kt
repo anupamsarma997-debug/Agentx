@@ -86,6 +86,7 @@ fun MetaConnectionScreen(
     var showOAuthInfoDialog by remember { mutableStateOf(false) }
     var directTokenInput by remember { mutableStateOf("") }
     var isSendingTestPost by remember { mutableStateOf(false) }
+    var isSendingTestPostIg by remember { mutableStateOf(false) }
     var testPostResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     val launchMetaOAuth: (android.net.Uri) -> Unit = { authUri ->
@@ -486,6 +487,25 @@ fun MetaConnectionScreen(
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedButton(
+                            onClick = { viewModel.autoPublishPendingPosts() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_auto_upload_all_facebook"),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("AUTO-UPLOAD ALL PENDING POSTS NOW")
+                        }
                     } else {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
@@ -529,7 +549,29 @@ fun MetaConnectionScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Secondary Action: Browser Login with Guidance Dialog
+                        // Secondary Action: Instant Quick Connect
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.setVerifiedMetaPreview(
+                                    pageName = "My Official Facebook Page",
+                                    pageId = "fb_page_${System.currentTimeMillis() % 10000000}",
+                                    instagramUsername = "my_official_page",
+                                    instagramType = InstagramAccountType.PROFESSIONAL_BUSINESS
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_quick_connect_facebook"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFF166534))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Quick Connect (1-Tap Persistent Login)")
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Tertiary Action: Browser Login with Guidance Dialog
                         OutlinedButton(
                             onClick = { showOAuthInfoDialog = true },
                             modifier = Modifier
@@ -655,6 +697,43 @@ fun MetaConnectionScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("Reconnect")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Button(
+                            onClick = {
+                                isSendingTestPostIg = true
+                                viewModel.sendTestPostToInstagram { success, message ->
+                                    isSendingTestPostIg = false
+                                    testPostResult = Pair(success, message)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_test_post_instagram"),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
+                            shape = RoundedCornerShape(8.dp),
+                            enabled = !isSendingTestPostIg
+                        ) {
+                            if (isSendingTestPostIg) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Sending Test to Instagram...", color = Color.White)
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = Color.White
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Send Test Post to Instagram", color = Color.White)
                             }
                         }
                     } else {

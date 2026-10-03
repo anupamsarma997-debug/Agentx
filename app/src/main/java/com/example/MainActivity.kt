@@ -53,10 +53,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIncomingOAuthIntent(intent: Intent?) {
-        intent?.data?.let { uri ->
-            if (uri.scheme == "socialagent" && (uri.host == "meta-callback" || uri.host == "callback")) {
-                appViewModel.handleOAuthCallback(uri)
-            }
+        val uri = intent?.data ?: return
+        if (uri.scheme == "socialagent" && (uri.host == "meta-callback" || uri.host == "callback")) {
+            // Clear the intent data immediately so configuration changes or activity re-creations don't re-trigger it
+            intent.data = null
+            appViewModel.handleOAuthCallback(uri)
         }
     }
 }

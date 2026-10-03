@@ -31,6 +31,10 @@ object OpportunityNormalizer {
         "apsc.nic.in",
         "dst.gov.in",
         "startupindia.gov.in",
+        "pib.gov.in",
+        "cgtmse.in",
+        "mudra.org.in",
+        "standupmitra.in",
         "devpost.com",
         "unstop.com",
         "hackerearth.com"

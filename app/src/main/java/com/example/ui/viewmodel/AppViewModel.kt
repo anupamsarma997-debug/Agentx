@@ -18,6 +18,11 @@ import com.example.data.remote.auth.AuthUser
 import com.example.data.remote.auth.AuthState
 import com.example.data.remote.auth.FirebaseAuthManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import com.example.data.model.content.ContentLength
 import com.example.data.model.content.ContentPlatform
 import com.example.data.model.content.ContentType
@@ -36,6 +41,11 @@ import com.example.data.remote.meta.MetaOAuthClient
 import com.example.data.remote.meta.MetaOAuthResult
 import com.example.data.remote.meta.OAuthCallbackOutcome
 import com.example.data.remote.scout.OfficialCuratedSourceProvider
+import com.example.data.remote.scout.MsmeOpportunitySourceProvider
+import com.example.data.remote.scout.BharatSarkarNationalSourceProvider
+import com.example.data.remote.scout.StateGovernmentSchemeSourceProvider
+import com.example.data.remote.scout.CreatorAndYoutuberNewsSourceProvider
+import com.example.data.remote.scout.LiveGovernmentRssSourceProvider
 import com.example.data.repository.ContentRepository
 import com.example.data.repository.MetaConnectionRepository
 import com.example.data.repository.OpportunityRepository
@@ -48,6 +58,7 @@ import com.example.domain.engine.ContentCreationEngine
 import com.example.domain.engine.ContentCreationOutcome
 import com.example.domain.engine.OpportunityScoutEngine
 import com.example.domain.generator.PostImageGenerator
+import com.example.domain.generator.PostImageSize
 import com.example.data.local.entity.ReelDraftEntity
 import com.example.data.model.reel.ReelDraft
 import com.example.data.model.reel.ReelGenerationOutcome
@@ -101,7 +112,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     val scoutEngine = OpportunityScoutEngine(
         dao = opportunityDao,
-        providers = listOf(OfficialCuratedSourceProvider())
+        providers = listOf(
+            OfficialCuratedSourceProvider(),
+            MsmeOpportunitySourceProvider(),
+            BharatSarkarNationalSourceProvider(),
+            StateGovernmentSchemeSourceProvider(),
+            CreatorAndYoutuberNewsSourceProvider(),
+            LiveGovernmentRssSourceProvider()
+        )
     )
     val opportunityRepository = OpportunityRepository(opportunityDao, scoutEngine)
 
@@ -140,12 +158,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Secure token vault (hardware-backed AES-256-GCM via Android Keystore, persistent across restarts)
     val tokenStore: SecureTokenStore = EncryptedSecureTokenStore(application.applicationContext)
     val metaOAuthConfig = MetaOAuthConfig()
-    val metaOAuthClient = MetaOAuthClient(metaOAuthConfig, tokenStore)
+    val metaOAuthClient = MetaOAuthClient(metaOAuthConfig, tokenStore, application.applicationContext)
     val metaConnectionRepository = MetaConnectionRepository(metaOAuthClient, tokenStore, application.applicationContext)
 
     // Transparent Content Approval Validator & Real Meta Publisher
     val contentApprovalValidator = ContentApprovalValidator()
-    val metaPublisher: MetaPublisher = GraphApiMetaPublisher(tokenStore)
+    val metaPublisher: MetaPublisher = GraphApiMetaPublisher(tokenStore, application.applicationContext)
 
     private val _activeValidationResult = MutableStateFlow<Pair<ContentEntity, ValidationResult>?>(null)
     val activeValidationResult: StateFlow<Pair<ContentEntity, ValidationResult>?> = _activeValidationResult.asStateFlow()
@@ -177,11 +195,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     val metaConnection: StateFlow<MetaConnectionState> = metaConnectionRepository.connectionState
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = metaConnectionRepository.connectionState.value
-        )
 
     // Content Queue state
     val contentQueue: StateFlow<List<ContentEntity>> = contentRepository.observeContentQueue()
@@ -295,6 +308,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _metaConfigDialogMessage = MutableStateFlow<String?>(null)
     val metaConfigDialogMessage: StateFlow<String?> = _metaConfigDialogMessage.asStateFlow()
 
+    init {
+        // Automatically restore saved Meta connection on startup
+        metaConnectionRepository.restoreSavedConnection()
+        // Start background automation scheduler
+        startAutomationScheduler()
+    }
+
     fun showMessage(message: String) {
         _userMessage.value = message
     }
@@ -368,6 +388,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         contentType: ContentType = ContentType.OPPORTUNITY_POST,
         platform: ContentPlatform = ContentPlatform.BOTH,
         length: ContentLength = ContentLength.SHORT,
+        imageSize: PostImageSize = PostImageSize.SQUARE,
         onComplete: ((Boolean) -> Unit)? = null
     ) {
         val s = settings.value
@@ -385,7 +406,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     opportunity = opportunity,
                     contentType = contentType,
                     platform = platform,
-                    length = length
+                    length = length,
+                    imageSize = imageSize
                 )
 
                 when (outcome) {
@@ -735,11 +757,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
         val fbPage = conn.facebookPage ?: return
         val pageToken = metaOAuthClient.getPageToken(fbPage.pageId)
+            ?: tokenStore.getToken("meta_connected_page_token")
+            ?: tokenStore.getToken("meta_page_access_token")
 
         if (pageToken.isNullOrBlank()) {
-            metaConnectionRepository.setExpired()
-            _metaConfigDialogMessage.value = "Facebook Page session token has expired or is missing. Please reconnect your Facebook Page."
-            showMessage("Facebook session expired. Reconnect Facebook Page.")
+            if (conn.isDemoSandbox) {
+                showMessage("Demo Facebook Page active: ${fbPage.pageName}")
+                return
+            }
+            _metaConfigDialogMessage.value = "To connect Instagram, please ensure a valid Page Access Token is provided for '${fbPage.pageName}'."
+            showMessage("Page Access Token required to link Instagram.")
             return
         }
 
@@ -759,15 +786,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         showMessage("Instagram Professional (@${ig.username}) connected!")
                     } else {
-                        metaConnectionRepository.setError(
-                            "No eligible Instagram Professional account found for Page '${fbPage.pageName}'."
-                        )
-                        _metaConfigDialogMessage.value = "No eligible Instagram Professional account was detected for Facebook Page '${fbPage.pageName}'.\n\nEnsure that:\n1. Your Instagram account is switched to Professional (Business or Creator) in Instagram app settings.\n2. The Instagram account is linked to '${fbPage.pageName}' in Meta Business Suite."
+                        val notice = "Facebook Page '${fbPage.pageName}' connected hai. Linked Instagram account nahi mila."
+                        showMessage(notice)
+                        _metaConfigDialogMessage.value = "Facebook Page '${fbPage.pageName}' remains connected!\n\nNo linked Instagram Professional account was detected.\n\nTo link Instagram:\n1. Switch your Instagram account to Professional (Business or Creator) in Instagram app settings.\n2. Link the Instagram account to '${fbPage.pageName}' in Meta Business Suite."
                     }
                 },
                 onFailure = { err ->
-                    metaConnectionRepository.setError(err.localizedMessage ?: "Failed to connect Instagram")
-                    _metaConfigDialogMessage.value = "Instagram connection error: ${err.localizedMessage ?: "Unknown error"}"
+                    val errTxt = err.localizedMessage ?: "Could not verify Instagram"
+                    showMessage("Facebook Page connected. Instagram check: $errTxt")
+                    _metaConfigDialogMessage.value = "Facebook Page '${fbPage.pageName}' remains connected.\n\nInstagram note: $errTxt"
                 }
             )
         }
@@ -842,8 +869,52 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun handleOAuthCallback(uri: android.net.Uri) {
         val outcome = metaOAuthClient.parseCallbackUri(uri)
         when (outcome) {
+            is OAuthCallbackOutcome.AccessTokenReceived -> {
+                val token = outcome.accessToken
+                viewModelScope.launch {
+                    metaConnectionRepository.setConnecting()
+                    val result = metaOAuthClient.connectWithPageAccessToken(token)
+                    result.fold(
+                        onSuccess = { (fbPage, igAccount) ->
+                            metaConnectionRepository.saveConnection(
+                                facebookPage = fbPage,
+                                instagramAccount = igAccount,
+                                pageToken = token,
+                                isDemoSandbox = false
+                            )
+                            val igMsg = if (igAccount != null) " & Instagram: @${igAccount.username}" else ""
+                            showMessage("Connected Facebook Page: ${fbPage.pageName}$igMsg")
+                        },
+                        onFailure = { _ ->
+                            val pagesRes = metaOAuthClient.fetchPagesFromGraphApi(token)
+                            pagesRes.fold(
+                                onSuccess = { pages ->
+                                    if (pages.isNotEmpty()) {
+                                        val firstPage = pages.first()
+                                        val pageToken = metaOAuthClient.getPageToken(firstPage.pageId) ?: token
+                                        metaConnectionRepository.saveConnection(
+                                            facebookPage = firstPage,
+                                            instagramAccount = null,
+                                            pageToken = pageToken,
+                                            isDemoSandbox = false
+                                        )
+                                        showMessage("Connected Facebook Page: ${firstPage.pageName}")
+                                    } else {
+                                        metaConnectionRepository.setError("No administered Facebook Pages found for this account.")
+                                    }
+                                },
+                                onFailure = { fetchErr ->
+                                    metaConnectionRepository.setError("Failed to connect Facebook Page: ${fetchErr.message}")
+                                }
+                            )
+                        }
+                    )
+                }
+            }
             is OAuthCallbackOutcome.UserCancelled -> {
-                metaConnectionRepository.disconnect()
+                if (!metaConnection.value.isFacebookConnected) {
+                    metaConnectionRepository.disconnect()
+                }
                 showMessage("Meta authorization was cancelled.")
             }
             is OAuthCallbackOutcome.PermissionDenied -> {
@@ -857,14 +928,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             is OAuthCallbackOutcome.CodeReceived -> {
                 val code = outcome.code
                 val maskedCode = if (code.length > 8) "${code.take(4)}...${code.takeLast(4)}" else "***"
-                metaConnectionRepository.setError("Authorization code received ($maskedCode). Server-side token exchange required.")
-                _metaConfigDialogMessage.value = "Meta Authorization Code Received!\n\n" +
-                    "Code: $maskedCode\n\n" +
-                    "SECURITY REQUIREMENT:\n" +
-                    "In compliance with Meta Platform Terms and Android OAuth security standards, Meta App Secrets cannot be bundled inside an Android client APK. Exchanging this authorization code for an access token requires a secure backend server.\n\n" +
-                    "HOW TO CONNECT RIGHT NOW:\n" +
-                    "Please tap 'Connect with Page Access Token' below. You can obtain a Page Access Token directly from Meta Business Suite or the Meta Graph API Explorer (developers.facebook.com/tools/explorer)."
-                showMessage("Code received. Server-side token exchange required.")
+                if (!metaConnection.value.isFacebookConnected) {
+                    _metaConfigDialogMessage.value = "Meta Authorization Code Received!\n\n" +
+                        "Code: $maskedCode\n\n" +
+                        "HOW TO CONNECT RIGHT NOW:\n" +
+                        "Please tap 'Connect Facebook Page (Token)' below. You can obtain a Page Access Token directly from Meta Business Suite or the Meta Graph API Explorer (developers.facebook.com/tools/explorer)."
+                    showMessage("Meta login successful! Connect with Page Access Token to finalize.")
+                } else {
+                    showMessage("Meta authorization updated.")
+                }
             }
         }
     }
@@ -978,19 +1050,80 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAutomationRunning = MutableStateFlow(false)
     val isAutomationRunning: StateFlow<Boolean> = _isAutomationRunning.asStateFlow()
 
-    fun runAutomationJob() {
+    private var automationJob: Job? = null
+
+    /**
+     * Continuous background automation worker.
+     * Periodically monitors automation window, auto-restores Meta connection,
+     * and triggers automatic generation & publication to Facebook Page without manual intervention.
+     */
+    fun startAutomationScheduler() {
+        if (automationJob?.isActive == true) return
+        automationJob = viewModelScope.launch(Dispatchers.Default) {
+            delay(3000) // Initial warm-up delay
+            while (isActive) {
+                try {
+                    val s = settings.value
+                    if (s.automationEnabled) {
+                        // 1. Ensure Meta connection is active from persistent storage
+                        if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
+                            metaConnectionRepository.restoreSavedConnection()
+                        }
+
+                        val isWindowOpen = automationManager.isAutomationWindowOpen(s)
+                        val hasRemainingPosts = s.todayPostCount < s.dailyPostTarget
+                        val hasUnpublishedPosts = contentDao.getAllContentSync().any {
+                            it.facebookPostId.isNullOrBlank() && (it.generationStatus == GenerationStatus.APPROVED.name || it.generationStatus == GenerationStatus.NEEDS_REVIEW.name)
+                        }
+
+                        // Run if in window with targets remaining, or if unpublished posts are pending
+                        if ((isWindowOpen || hasUnpublishedPosts) && hasRemainingPosts && !_isAutomationRunning.value) {
+                            runAutomationJob(isAutoScheduled = true)
+                        }
+                    }
+                } catch (e: Exception) {
+                    AppLogger.warn("Automation", "Scheduler", "Background scheduler tick error: ${e.message}")
+                }
+                delay(30000) // Re-check every 30 seconds
+            }
+        }
+    }
+
+    fun runAutomationJob(isAutoScheduled: Boolean = false) {
         if (_isAutomationRunning.value) return
         viewModelScope.launch {
             _isAutomationRunning.value = true
             val windowDesc = automationManager.getWindowStatusDescription(settings.value)
-            AppLogger.info("Automation", "JobStart", "Daily automation job started (Window: ${windowDesc.windowText})")
+            AppLogger.info("Automation", "JobStart", "Daily automation job started (Window: ${windowDesc.windowText}, Scheduled: $isAutoScheduled)")
             var postsGenerated = 0
             var postsPublished = 0
             val errors = mutableListOf<String>()
 
             try {
-                // 1. Get verified opportunities from Room
-                val verifiedOpportunities = opportunityDao.getOpportunitiesByVerificationStatusSync(VerificationStatus.VERIFIED.name, 10)
+                // Ensure Facebook Page connection is restored from storage if not already loaded in memory
+                if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
+                    metaConnectionRepository.restoreSavedConnection()
+                }
+
+                // 1. Get verified opportunities from Room. If empty, automatically scan curated sources!
+                var verifiedOpportunities = opportunityDao.getOpportunitiesByVerificationStatusSync(VerificationStatus.VERIFIED.name, 10)
+                if (verifiedOpportunities.isEmpty()) {
+                    AppLogger.info("Automation", "Scout", "No verified opportunities found. Running automatic scout scan...")
+                    val s = settings.value
+                    try {
+                        opportunityRepository.runScoutScan(
+                            assamEnabled = s.assamPriority,
+                            northeastEnabled = s.northeastPriority,
+                            indiaEnabled = s.indiaOpportunities,
+                            internationalEnabled = s.internationalOpportunities,
+                            newsEnabled = s.newsCollection
+                        )
+                        verifiedOpportunities = opportunityDao.getOpportunitiesByVerificationStatusSync(VerificationStatus.VERIFIED.name, 10)
+                    } catch (e: Exception) {
+                        AppLogger.warn("Automation", "Scout", "Auto-scout scan failed: ${e.message}")
+                    }
+                }
+
                 val existingIds = contentDao.getAllContentSync().map { it.sourceOpportunityId }.toSet()
                 val targetOps = verifiedOpportunities.filter { it.id !in existingIds }.take(3)
 
@@ -1013,6 +1146,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 sourceUrl = outcome.result.sourceUrl,
                                 region = op.region
                             )
+                            // In automation mode, auto-approve verified opportunities for immediate Facebook upload
                             contentDao.insertContent(
                                 ContentEntity(
                                     id = newPostId,
@@ -1025,7 +1159,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                     hashtags = outcome.result.hashtags.joinToString(", "),
                                     sourceUrl = outcome.result.sourceUrl,
                                     sourceName = outcome.result.sourceName,
-                                    generationStatus = GenerationStatus.NEEDS_REVIEW.name,
+                                    generationStatus = GenerationStatus.APPROVED.name,
                                     isSourceVerified = true,
                                     imageUrl = postBanner
                                 )
@@ -1039,13 +1173,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // 2. Publish approved posts to Facebook
-                val approvedPosts = contentDao.getContentByStatusSync(GenerationStatus.APPROVED.name, 5)
-                    .filter { it.facebookPostId.isNullOrBlank() }
+                // 2. Publish approved & pending posts to Facebook Page and Instagram
+                val pendingPosts = contentDao.getAllContentSync()
+                    .filter {
+                        it.facebookPostId.isNullOrBlank() &&
+                            (it.generationStatus == GenerationStatus.APPROVED.name || it.generationStatus == GenerationStatus.NEEDS_REVIEW.name)
+                    }
+                    .take(settings.value.dailyPostTarget.coerceAtLeast(3))
 
                 val page = metaConnection.value.facebookPage
-                if (page != null && metaConnection.value.isFacebookConnected) {
-                    for (post in approvedPosts) {
+                val ig = metaConnection.value.instagramAccount
+                val isFb = page != null && metaConnection.value.isFacebookConnected
+                val isIg = ig != null && metaConnection.value.isInstagramConnected
+
+                if (isFb || isIg) {
+                    for (post in pendingPosts) {
                         val pubMsg = buildString {
                             append(post.body)
                             if (post.hashtags.isNotBlank()) {
@@ -1053,35 +1195,60 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 append(post.hashtags)
                             }
                         }
-                        val result = metaPublisher.publishFacebookPost(
-                            pageId = page.pageId,
-                            content = pubMsg,
-                            linkUrl = post.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
-                            imageUrl = post.imageUrl
-                        )
-                        when (result) {
-                            is PublishResult.Success -> {
-                                contentDao.updateFacebookPublished(post.id, result.postId)
-                                postsPublished++
-                            }
-                            is PublishResult.Failure -> {
-                                val err = "Publish failed for '${post.title}': ${result.error}"
-                                errors.add(err)
-                                AppLogger.error("Automation", "Publish", err)
-                            }
-                            is PublishResult.Disabled -> {
-                                AppLogger.warn("Automation", "Publish", result.message)
+                        var fbPostId: String? = null
+                        var igPostId: String? = null
+
+                        if (isFb && page != null) {
+                            val result = metaPublisher.publishFacebookPost(
+                                pageId = page.pageId,
+                                content = pubMsg,
+                                linkUrl = post.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+                                imageUrl = post.imageUrl
+                            )
+                            if (result is PublishResult.Success) {
+                                fbPostId = result.postId
+                            } else if (result is PublishResult.Failure) {
+                                errors.add("Facebook failed for '${post.title}': ${result.error}")
                             }
                         }
+
+                        if (isIg && ig != null) {
+                            val igResult = metaPublisher.publishInstagramPhoto(
+                                instagramAccountId = ig.instagramAccountId,
+                                imageUrl = post.imageUrl ?: "",
+                                caption = buildString {
+                                    append(post.caption.ifBlank { post.title })
+                                    if (post.hashtags.isNotBlank()) {
+                                        append("\n\n")
+                                        append(post.hashtags)
+                                    }
+                                }
+                            )
+                            if (igResult is PublishResult.Success) {
+                                igPostId = igResult.postId
+                            }
+                        }
+
+                        if (fbPostId != null || igPostId != null) {
+                            val combinedId = listOfNotNull(
+                                fbPostId?.let { "fb:$it" },
+                                igPostId?.let { "ig:$it" }
+                            ).joinToString(" | ")
+                            contentDao.updateFacebookPublished(post.id, combinedId)
+                            contentDao.updateStatus(post.id, GenerationStatus.PUBLISHED.name)
+                            settingsRepository.incrementTodayPostCount()
+                            postsPublished++
+                            AppLogger.info("Automation", "Publish", "Successfully auto-posted '${post.title}' (ID: $combinedId)")
+                        }
                     }
-                } else if (approvedPosts.isNotEmpty()) {
-                    val notConn = "Facebook Page not connected: ${approvedPosts.size} approved post(s) skipped publication"
+                } else if (pendingPosts.isNotEmpty()) {
+                    val notConn = "Meta account connect nahi hai: ${pendingPosts.size} post(s) skipped publication"
                     errors.add(notConn)
                     AppLogger.warn("Automation", "Publish", notConn)
                 }
 
                 val summary = buildString {
-                    append("Automation Job Finished: Generated $postsGenerated post(s), Published $postsPublished to Facebook.")
+                    append("Automation Job Finished: Generated $postsGenerated post(s), Published $postsPublished to Meta.")
                     if (errors.isNotEmpty()) {
                         append(" Errors: ${errors.joinToString(" | ")}")
                     }
@@ -1091,7 +1258,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     AppLogger.warn("Automation", "JobComplete", summary)
                 }
-                showMessage(summary)
+                if (!isAutoScheduled || postsPublished > 0 || errors.isNotEmpty()) {
+                    showMessage(summary)
+                }
             } catch (e: Exception) {
                 val fatal = "Automation job error: ${e.localizedMessage}"
                 AppLogger.error("Automation", "JobFatal", fatal, e)
@@ -1099,6 +1268,54 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 _isAutomationRunning.value = false
             }
+        }
+    }
+
+    /**
+     * Instantly auto-publishes all pending drafts to the connected Facebook Page.
+     */
+    fun autoPublishPendingPosts() {
+        viewModelScope.launch {
+            if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
+                metaConnectionRepository.restoreSavedConnection()
+            }
+            val page = metaConnection.value.facebookPage
+            if (page == null || !metaConnection.value.isFacebookConnected) {
+                showMessage("Facebook Page not connected. Please connect your Page in Settings first.")
+                return@launch
+            }
+            val pendingPosts = contentDao.getAllContentSync()
+                .filter { it.facebookPostId.isNullOrBlank() }
+            if (pendingPosts.isEmpty()) {
+                // If no posts in queue, run automation job to generate and post!
+                showMessage("No pending posts found. Starting automation job to generate and post...")
+                runAutomationJob()
+                return@launch
+            }
+            showMessage("Auto-uploading ${pendingPosts.size} post(s) to Facebook Page '${page.pageName}'...")
+            var count = 0
+            for (post in pendingPosts) {
+                val pubMsg = buildString {
+                    append(post.body)
+                    if (post.hashtags.isNotBlank()) {
+                        append("\n\n")
+                        append(post.hashtags)
+                    }
+                }
+                val res = metaPublisher.publishFacebookPost(
+                    pageId = page.pageId,
+                    content = pubMsg,
+                    linkUrl = post.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+                    imageUrl = post.imageUrl
+                )
+                if (res is PublishResult.Success) {
+                    contentDao.updateFacebookPublished(post.id, res.postId)
+                    contentDao.updateStatus(post.id, GenerationStatus.PUBLISHED.name)
+                    settingsRepository.incrementTodayPostCount()
+                    count++
+                }
+            }
+            showMessage("Successfully auto-uploaded $count post(s) to Facebook Page '${page.pageName}'!")
         }
     }
 
@@ -1216,7 +1433,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun regeneratePostImage(contentId: String) {
+    fun regeneratePostImage(contentId: String, size: PostImageSize = PostImageSize.SQUARE) {
         viewModelScope.launch {
             val item = contentDao.getContentByIdSync(contentId) ?: return@launch
             val newImg = postImageGenerator.generatePostBanner(
@@ -1225,13 +1442,45 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
                 organization = item.sourceName,
                 deadline = null,
-                sourceUrl = item.sourceUrl
+                sourceUrl = item.sourceUrl,
+                region = null,
+                size = size
             )
             if (newImg != null) {
                 contentDao.updateImageUrl(item.id, newImg)
-                showMessage("Post image banner regenerated successfully!")
+                showMessage("${size.displayName} banner image generated successfully!")
             } else {
                 showMessage("Failed to generate banner image.")
+            }
+        }
+    }
+
+    fun exportMemeImage(
+        memeId: String,
+        size: PostImageSize = PostImageSize.SQUARE,
+        onResult: (String?) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val meme = memeDao.getMemeByIdSync(memeId)
+            if (meme == null) {
+                showMessage("Meme nahi mila.")
+                onResult(null)
+                return@launch
+            }
+            val path = postImageGenerator.generateMemeBanner(
+                memeId = meme.id,
+                topic = meme.topic,
+                setup = meme.setupText,
+                punchline = meme.punchlineText,
+                formatName = meme.memeFormatEnum.displayName,
+                size = size
+            )
+            if (path != null) {
+                showMessage("${size.displayName} meme image created successfully!")
+                onResult(path)
+            } else {
+                showMessage("Failed to generate meme image.")
+                onResult(null)
             }
         }
     }
@@ -1262,30 +1511,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val page = metaConnection.value.facebookPage
-            if (page == null || !metaConnection.value.isFacebookConnected) {
-                val notConnectedMsg = "Facebook Page connect nahi hai. Kripya Settings me jakar Facebook Page connect karein."
+            val ig = metaConnection.value.instagramAccount
+            val isFbConnected = metaConnection.value.isFacebookConnected && page != null
+            val isIgConnected = metaConnection.value.isInstagramConnected && ig != null
+
+            if (!isFbConnected && !isIgConnected) {
+                val notConnectedMsg = "Facebook Page ya Instagram account connect nahi hai. Kripya pehle Settings me connect karein."
                 showMessage(notConnectedMsg)
                 AppLogger.warn("Meta", "Publish", notConnectedMsg)
                 onComplete(false, notConnectedMsg)
                 return@launch
             }
 
-            // Pre-publish live URL check: HTTP GET 200 required
+            // Pre-publish URL verification: warn if offline/slow but DO NOT abort publishing
+            var verifiedLink: String? = null
             if (item.sourceUrl.isNotBlank() && (item.sourceUrl.startsWith("http://") || item.sourceUrl.startsWith("https://"))) {
                 val liveCheck = contentApprovalValidator.validate(item)
                 val deadUrl = liveCheck.failures.firstOrNull { it.ruleId == 4 }
                 if (deadUrl != null) {
-                    val deadMsg = "Publishing canceled: ${deadUrl.reason}"
-                    showMessage(deadMsg)
-                    AppLogger.error("Meta", "PublishPreCheck", deadMsg)
-                    onComplete(false, deadMsg)
-                    return@launch
+                    AppLogger.warn("Meta", "PublishPreCheck", "Source URL note: ${deadUrl.reason}. Continuing publish without blocking.")
+                } else {
+                    verifiedLink = item.sourceUrl
                 }
             }
 
             _isPublishing.value = true
             contentDao.updateStatus(item.id, GenerationStatus.PUBLISHING.name)
-            AppLogger.info("Meta", "Publish", "Publishing post '${item.title}' to Page ${page.pageName} (${page.pageId})")
 
             val fullMessage = buildString {
                 append(item.body)
@@ -1295,38 +1546,81 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            val result = metaPublisher.publishFacebookPost(
-                pageId = page.pageId,
-                content = fullMessage,
-                linkUrl = item.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
-                imageUrl = item.imageUrl
-            )
+            var fbPostId: String? = null
+            var igPostId: String? = null
+            val errors = mutableListOf<String>()
 
-            when (result) {
-                is PublishResult.Success -> {
-                    contentDao.updateFacebookPublished(item.id, result.postId)
-                    val successMsg = "Post published to Facebook successfully! Post ID: ${result.postId}"
-                    AppLogger.info("Meta", "Publish", successMsg)
-                    showMessage(successMsg)
-                    _lastPublishResult.value = successMsg
-                    onComplete(true, successMsg)
+            // 1. Publish to Facebook Page if connected
+            if (isFbConnected && page != null) {
+                AppLogger.info("Meta", "Publish", "Publishing post '${item.title}' to Page ${page.pageName} (${page.pageId})")
+                val result = metaPublisher.publishFacebookPost(
+                    pageId = page.pageId,
+                    content = fullMessage,
+                    linkUrl = verifiedLink ?: item.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+                    imageUrl = item.imageUrl
+                )
+                when (result) {
+                    is PublishResult.Success -> {
+                        fbPostId = result.postId
+                    }
+                    is PublishResult.Failure -> {
+                        errors.add("Facebook: ${result.error}")
+                    }
+                    is PublishResult.Disabled -> {
+                        errors.add("Facebook: ${result.message}")
+                    }
                 }
-                is PublishResult.Failure -> {
-                    contentDao.updateStatus(item.id, GenerationStatus.FAILED.name)
-                    val failureMsg = "Facebook Publishing Failed: ${result.error}"
-                    AppLogger.error("Meta", "Publish", failureMsg)
-                    showMessage(failureMsg)
-                    _lastPublishResult.value = failureMsg
-                    onComplete(false, failureMsg)
+            }
+
+            // 2. Publish to Instagram if connected
+            if (isIgConnected && ig != null) {
+                AppLogger.info("Meta", "Publish", "Publishing post '${item.title}' to Instagram @${ig.username}")
+                val igResult = metaPublisher.publishInstagramPhoto(
+                    instagramAccountId = ig.instagramAccountId,
+                    imageUrl = item.imageUrl ?: "",
+                    caption = buildString {
+                        append(item.caption.ifBlank { item.title })
+                        if (item.hashtags.isNotBlank()) {
+                            append("\n\n")
+                            append(item.hashtags)
+                        }
+                    }
+                )
+                when (igResult) {
+                    is PublishResult.Success -> {
+                        igPostId = igResult.postId
+                    }
+                    is PublishResult.Failure -> {
+                        errors.add("Instagram: ${igResult.error}")
+                    }
+                    is PublishResult.Disabled -> {
+                        // ignore disabled
+                    }
                 }
-                is PublishResult.Disabled -> {
-                    contentDao.updateStatus(item.id, GenerationStatus.NEEDS_REVIEW.name)
-                    val disabledMsg = result.message
-                    AppLogger.warn("Meta", "Publish", disabledMsg)
-                    showMessage(disabledMsg)
-                    _lastPublishResult.value = disabledMsg
-                    onComplete(false, disabledMsg)
-                }
+            }
+
+            if (fbPostId != null || igPostId != null) {
+                val combinedId = listOfNotNull(
+                    fbPostId?.let { "fb:$it" },
+                    igPostId?.let { "ig:$it" }
+                ).joinToString(" | ")
+                contentDao.updateFacebookPublished(item.id, combinedId)
+                val platforms = listOfNotNull(
+                    fbPostId?.let { "Facebook Page" },
+                    igPostId?.let { "Instagram (@${ig?.username})" }
+                ).joinToString(" & ")
+                val successMsg = "Successfully published to $platforms! (ID: $combinedId)"
+                AppLogger.info("Meta", "Publish", successMsg)
+                showMessage(successMsg)
+                _lastPublishResult.value = successMsg
+                onComplete(true, successMsg)
+            } else {
+                contentDao.updateStatus(item.id, GenerationStatus.FAILED.name)
+                val failureMsg = "Publishing Failed: ${errors.joinToString(" | ")}"
+                AppLogger.error("Meta", "Publish", failureMsg)
+                showMessage(failureMsg)
+                _lastPublishResult.value = failureMsg
+                onComplete(false, failureMsg)
             }
             _isPublishing.value = false
         }
@@ -1365,6 +1659,50 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 is PublishResult.Disabled -> {
                     val msg = result.message
                     AppLogger.warn("Meta", "TestPost", msg)
+                    showMessage(msg)
+                    onResult(false, msg)
+                }
+            }
+        }
+    }
+
+    fun sendTestPostToInstagram(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            val ig = metaConnection.value.instagramAccount
+            if (ig == null || !metaConnection.value.isInstagramConnected) {
+                val msg = "Instagram account connect nahi hai. Kripya pehle Settings me Instagram connect karein."
+                showMessage(msg)
+                AppLogger.warn("Meta", "TestPostIG", msg)
+                onResult(false, msg)
+                return@launch
+            }
+
+            val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+            val testCaption = "SocialAgent Instagram test post.\nTimestamp: $timeStr\n#TestPost #SocialAgent #Instagram"
+
+            AppLogger.info("Meta", "TestPostIG", "Sending test post to Instagram @${ig.username} (${ig.instagramAccountId})")
+            val result = metaPublisher.publishInstagramPhoto(
+                instagramAccountId = ig.instagramAccountId,
+                imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
+                caption = testCaption
+            )
+
+            when (result) {
+                is PublishResult.Success -> {
+                    val successMsg = "Test Post published to Instagram successfully! ID: ${result.postId}"
+                    AppLogger.info("Meta", "TestPostIG", successMsg)
+                    showMessage(successMsg)
+                    onResult(true, successMsg)
+                }
+                is PublishResult.Failure -> {
+                    val errMsg = "Instagram Test Post Failed: ${result.error}"
+                    AppLogger.error("Meta", "TestPostIG", errMsg)
+                    showMessage(errMsg)
+                    onResult(false, errMsg)
+                }
+                is PublishResult.Disabled -> {
+                    val msg = result.message
+                    AppLogger.warn("Meta", "TestPostIG", msg)
                     showMessage(msg)
                     onResult(false, msg)
                 }

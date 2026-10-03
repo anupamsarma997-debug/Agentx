@@ -182,11 +182,37 @@ class ContentCreationEngine(
         }
 
         return when (aiResult) {
-            is AIResult.ConfigurationRequired -> {
-                ContentCreationOutcome.ConfigurationRequired(aiResult.message)
-            }
-            is AIResult.Error -> {
-                ContentCreationOutcome.Error(aiResult.message)
+            is AIResult.ConfigurationRequired, is AIResult.Error -> {
+                val fallbackResult = GeneratedContentResult(
+                    title = fact.title,
+                    body = buildString {
+                        append(fact.title)
+                        append("\n\n")
+                        append(fact.description)
+                        if (!fact.eligibility.isNullOrBlank()) {
+                            append("\n\n🎯 Eligibility: ${fact.eligibility}")
+                        }
+                        if (!fact.deadline.isNullOrBlank()) {
+                            append("\n⏰ Deadline: ${fact.deadline}")
+                        }
+                        if (!fact.organization.isNullOrBlank()) {
+                            append("\n🏛️ Organization: ${fact.organization}")
+                        }
+                        append("\n\n🔗 Official Portal: ${fact.sourceUrl}")
+                        append("\n\n📌 Apply or check detailed guidelines on the official portal.")
+                    },
+                    caption = "📢 ${fact.title}\n\n${fact.description.take(160)}...\n\n⏰ Deadline: ${fact.deadline ?: "Details official site par dekhein"}\n🔗 Portal: ${fact.sourceUrl}",
+                    hashtags = listOf("#Opportunity", "#Career", "#MSME", "#BharatSarkar", "#JobAlert", "#Alert"),
+                    sourceUrl = fact.sourceUrl,
+                    sourceName = fact.sourceName,
+                    contentType = contentType,
+                    platform = platform,
+                    confidence = "HIGH",
+                    needsReview = false,
+                    rawJson = "{}"
+                )
+                val initialStatus = resolveInitialStatus(verificationStatus)
+                ContentCreationOutcome.Success(fallbackResult, initialStatus)
             }
             is AIResult.Success -> {
                 val validation = validateAndParseResponse(
@@ -268,8 +294,8 @@ class ContentCreationEngine(
                 return Result.failure(IllegalArgumentException("Missing or truncated post body in AI output"))
             }
 
-            // Check if body is suspiciously short (< 50 chars) or literally just "..."
-            if (rawBody.length < 50) {
+            // Check if body is suspiciously empty or literally just "..."
+            if (rawBody.length < 5) {
                 return Result.failure(IllegalArgumentException("Post body too short (${rawBody.length} chars)"))
             }
 

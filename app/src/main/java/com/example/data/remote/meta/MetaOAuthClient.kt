@@ -112,7 +112,8 @@ sealed interface MetaOAuthResult {
 
 class MetaOAuthClient(
     val config: MetaOAuthConfig = MetaOAuthConfig(),
-    private val tokenStore: SecureTokenStore
+    private val tokenStore: SecureTokenStore,
+    private val context: android.content.Context? = null
 ) {
 
     private var activeStateNonce: String? = null
@@ -125,6 +126,7 @@ class MetaOAuthClient(
 
     /**
      * Constructs the official Meta OAuth authorization URL with CSRF state protection.
+     * Uses token response_type for direct client-side authentication without requiring server-side exchange.
      * Returns null if Meta App ID is missing.
      */
     fun buildAuthorizationUri(): Uri? {
@@ -139,13 +141,14 @@ class MetaOAuthClient(
             .appendQueryParameter("client_id", config.appId)
             .appendQueryParameter("redirect_uri", config.redirectUri)
             .appendQueryParameter("scope", scopeString)
-            .appendQueryParameter("response_type", "code")
+            .appendQueryParameter("response_type", "token,granted_scopes")
             .appendQueryParameter("state", nonce)
             .build()
     }
 
     /**
      * Validates callback parameters from official redirect URI with CSRF protection and cancellation checks.
+     * Handles both direct access token (from implicit client grant) and authorization codes.
      */
     fun parseCallbackUri(uri: Uri): OAuthCallbackOutcome {
         val error = uri.getQueryParameter("error")
@@ -168,11 +171,26 @@ class MetaOAuthClient(
         }
         activeStateNonce = null
 
+        // 1. Direct Access Token in URL fragment (#access_token=...) or query (?access_token=...)
+        val fragment = uri.fragment ?: ""
+        val tokenFromFragment = if (fragment.contains("access_token=")) {
+            fragment.split("&")
+                .firstOrNull { it.startsWith("access_token=") }
+                ?.substringAfter("access_token=")
+        } else null
+        val tokenFromQuery = uri.getQueryParameter("access_token")
+        val directToken = tokenFromFragment ?: tokenFromQuery
+
+        if (!directToken.isNullOrBlank()) {
+            return OAuthCallbackOutcome.AccessTokenReceived(directToken)
+        }
+
+        // 2. Authorization code fallback
         val code = uri.getQueryParameter("code")
         return if (!code.isNullOrBlank()) {
             OAuthCallbackOutcome.CodeReceived(code)
         } else {
-            OAuthCallbackOutcome.Error("No authorization code received in callback.")
+            OAuthCallbackOutcome.Error("No access token or authorization code received in callback.")
         }
     }
 
@@ -430,12 +448,20 @@ class MetaOAuthClient(
 
     fun getPageToken(pageId: String): String? {
         val key = "${TOKEN_KEY_PAGE_ACCESS}_$pageId"
-        return tokenStore.getToken(key) ?: tokenStore.getToken(TOKEN_KEY_PAGE_ACCESS)
+        val fromStore = tokenStore.getToken(key)
+            ?: tokenStore.getToken(TOKEN_KEY_PAGE_ACCESS)
+            ?: tokenStore.getToken("meta_connected_page_token")
+        if (!fromStore.isNullOrBlank()) return fromStore
+
+        val fromPrefs = context?.getSharedPreferences("social_agent_meta_connection_store", android.content.Context.MODE_PRIVATE)
+            ?.getString("page_token", null)
+            ?: context?.getSharedPreferences("meta_connection_store", android.content.Context.MODE_PRIVATE)
+                ?.getString("page_token", null)
+        return fromPrefs?.takeIf { it.isNotBlank() }
     }
 
     fun hasPageToken(pageId: String): Boolean {
-        val key = "${TOKEN_KEY_PAGE_ACCESS}_$pageId"
-        return tokenStore.hasToken(key) || tokenStore.hasToken(TOKEN_KEY_PAGE_ACCESS)
+        return !getPageToken(pageId).isNullOrBlank()
     }
 
     fun clearTokens() {
@@ -448,6 +474,7 @@ class MetaOAuthClient(
 }
 
 sealed interface OAuthCallbackOutcome {
+    data class AccessTokenReceived(val accessToken: String) : OAuthCallbackOutcome
     data class CodeReceived(val code: String) : OAuthCallbackOutcome
     data object UserCancelled : OAuthCallbackOutcome
     data object PermissionDenied : OAuthCallbackOutcome

@@ -58,6 +58,7 @@ import com.example.data.model.content.ContentType
 import com.example.data.model.meme.MemeFormat
 import com.example.data.model.meme.MemeTopic
 import com.example.data.model.opportunity.VerificationStatus
+import com.example.domain.generator.PostImageSize
 import com.example.ui.screens.opportunities.VerificationBadge
 import com.example.ui.viewmodel.AppViewModel
 
@@ -77,6 +78,7 @@ fun GeneratorScreen(
     var selectedContentType by remember { mutableStateOf(ContentType.OPPORTUNITY_POST) }
     var selectedPlatform by remember { mutableStateOf(ContentPlatform.BOTH) }
     var selectedLength by remember { mutableStateOf(ContentLength.SHORT) }
+    var selectedImageSize by remember { mutableStateOf(PostImageSize.SQUARE) }
     var showSourceSelectorDialog by remember { mutableStateOf(false) }
 
     // Auto-select first verified opportunity if none selected
@@ -295,6 +297,35 @@ fun GeneratorScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Banner Image Size / Aspect Ratio Selector
+                Text(
+                    text = "Banner Size & Aspect Ratio",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    PostImageSize.entries.forEach { size ->
+                        FilterChip(
+                            selected = selectedImageSize == size,
+                            onClick = { selectedImageSize = size },
+                            label = { Text(size.displayName) },
+                            modifier = Modifier.testTag("size_chip_${size.id}")
+                        )
+                    }
+                }
+                Text(
+                    text = selectedImageSize.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 Spacer(modifier = Modifier.height(18.dp))
 
                 // Action Button: GENERATE DRAFT
@@ -305,7 +336,8 @@ fun GeneratorScreen(
                                 opportunity = opp,
                                 contentType = selectedContentType,
                                 platform = selectedPlatform,
-                                length = selectedLength
+                                length = selectedLength,
+                                imageSize = selectedImageSize
                             ) { success ->
                                 if (success) {
                                     onNavigateToQueue()
@@ -432,6 +464,8 @@ fun MemeGeneratorSection(
 
     var selectedSourceType by remember { mutableStateOf("Assam Topic") }
     val sourceOptions = listOf(
+        "YouTuber & Creator News (NewsBoy / Neon Man)",
+        "MSME & Sarkari Schemes",
         "Verified Opportunity",
         "Verified News",
         "Assam Topic",
@@ -444,8 +478,10 @@ fun MemeGeneratorSection(
     var selectedOpportunityForMeme by remember { mutableStateOf<OpportunityEntity?>(null) }
     var showMemeOppSelector by remember { mutableStateOf(false) }
 
-    var selectedFormat by remember { mutableStateOf(MemeFormat.ASSAM_RELATABLE) }
+    var selectedFormat by remember { mutableStateOf(MemeFormat.NEWSBOY_CREATOR_STYLE) }
     val formatStyles = listOf(
+        Pair("NewsBoy & Neon Man Style", MemeFormat.NEWSBOY_CREATOR_STYLE),
+        Pair("Sarkari Scheme Relatable", MemeFormat.SARKARI_SCHEME_RELATABLE),
         Pair("Assam Relatable", MemeFormat.ASSAM_RELATABLE),
         Pair("Job Relatable", MemeFormat.JOB_RELATABLE),
         Pair("Student Relatable", MemeFormat.STUDENT_RELATABLE),
@@ -522,6 +558,16 @@ fun MemeGeneratorSection(
                         onClick = {
                             selectedSourceType = option
                             when (option) {
+                                "YouTuber & Creator News (NewsBoy / Neon Man)" -> {
+                                    customTopicText = "NewsBoy & Neon Man Creator Updates"
+                                    customContextText = "Fast breaking updates on top Indian YouTubers, viral controversies, milestones, and creator buzz."
+                                    selectedFormat = MemeFormat.NEWSBOY_CREATOR_STYLE
+                                }
+                                "MSME & Sarkari Schemes" -> {
+                                    customTopicText = "Bharat Sarkar MSME PMEGP & Subsidy Opportunities"
+                                    customContextText = "Student and entrepreneur reactions discovering official ₹50 Lakh project loans and Udyam benefits."
+                                    selectedFormat = MemeFormat.SARKARI_SCHEME_RELATABLE
+                                }
                                 "Assam Topic" -> {
                                     customTopicText = "Guwahati Traffic vs Monsoon Rains"
                                     customContextText = "Everyday situations navigating city waterlogging and tea breaks."
@@ -636,6 +682,10 @@ fun MemeGeneratorSection(
                     val topic = if (selectedSourceType == "Verified Opportunity" || selectedSourceType == "Verified News") {
                         selectedOpportunityForMeme?.let { MemeTopic.fromOpportunity(it) }
                             ?: MemeTopic.createAssamTheme(customTopicText, customContextText)
+                    } else if (selectedSourceType == "YouTuber & Creator News (NewsBoy / Neon Man)") {
+                        MemeTopic.createCreatorNewsTheme(customTopicText, customContextText)
+                    } else if (selectedSourceType == "MSME & Sarkari Schemes") {
+                        MemeTopic.createSarkariSchemeTheme(customTopicText, customContextText)
                     } else if (selectedSourceType == "Northeast Topic") {
                         MemeTopic.createNortheastTheme(customTopicText, customContextText)
                     } else if (selectedSourceType == "General Topic") {
