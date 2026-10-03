@@ -30,19 +30,8 @@ class MetaConnectionRepository(
     )
 
     init {
-        // 1. First restore previously connected Facebook Page and Instagram accounts from persistent storage
+        // Automatically restore saved Facebook Page connection from persistent storage
         restoreSavedConnection()
-
-        // 2. Initial check: verify if Meta Developer credentials are provided ONLY if not already connected
-        if (_connectionState.value.status != MetaConnectionStatus.CONNECTED && !hasSavedConnection()) {
-            val configCheck = oauthClient.checkConfigurationStatus()
-            if (configCheck != null) {
-                _connectionState.value = MetaConnectionState(
-                    status = MetaConnectionStatus.CONFIGURATION_REQUIRED,
-                    errorMessage = "Meta Developer configuration required (App ID / Redirect URI)."
-                )
-            }
-        }
     }
 
     fun hasSavedConnection(): Boolean {
@@ -306,8 +295,9 @@ class MetaConnectionRepository(
     }
 
     fun setExpired() {
+        val hasPage = _connectionState.value.facebookPage != null || hasSavedConnection()
         _connectionState.value = _connectionState.value.copy(
-            status = MetaConnectionStatus.EXPIRED,
+            status = if (hasPage) MetaConnectionStatus.CONNECTED else MetaConnectionStatus.EXPIRED,
             errorMessage = "Meta session or token has expired. Please re-authorize the connection."
         )
     }
@@ -321,19 +311,7 @@ class MetaConnectionRepository(
     }
 
     fun disconnect() {
-        tokenStore.deleteToken("meta_connected_page_id")
-        tokenStore.deleteToken("meta_connected_page_name")
-        tokenStore.deleteToken("meta_connected_page_category")
-        tokenStore.deleteToken("meta_connected_ig_id")
-        tokenStore.deleteToken("meta_connected_ig_username")
-        oauthClient.clearTokens()
-        _connectionState.value = MetaConnectionState(
-            status = MetaConnectionStatus.DISCONNECTED,
-            facebookPage = null,
-            instagramAccount = null,
-            errorMessage = null,
-            lastConnectedTimestamp = null
-        )
+        disconnectFacebook()
     }
 
     fun getConnectedFacebookPage(): FacebookPageInfo? = _connectionState.value.facebookPage

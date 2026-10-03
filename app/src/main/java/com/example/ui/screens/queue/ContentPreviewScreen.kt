@@ -30,6 +30,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -402,8 +403,8 @@ fun ContentPreviewScreen(
                             OutlinedTextField(
                                 value = editedCaption,
                                 onValueChange = { editedCaption = it },
-                                label = { Text("Caption (Instagram / Short Feed)") },
-                                minLines = 3,
+                                label = { Text("Short Summary / Headline") },
+                                minLines = 2,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("edit_content_caption")
@@ -447,20 +448,22 @@ fun ContentPreviewScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
 
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                            if (content.caption.isNotBlank()) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-                            Text(
-                                text = "Instagram Caption",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFE1306C)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = content.caption,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                                Text(
+                                    text = "Short Summary",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = content.caption,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
 
                             if (content.hashtags.isNotBlank()) {
                                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
@@ -527,7 +530,7 @@ fun ContentPreviewScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Social Publishing Card (Facebook / Instagram / Both)
+                // Facebook Page Publishing Card
                 if (content.generationStatusEnum != GenerationStatus.PUBLISHED) {
                     Card(
                         modifier = Modifier.fillMaxWidth().testTag("social_publishing_card"),
@@ -542,14 +545,14 @@ fun ContentPreviewScreen(
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        imageVector = Icons.Default.Share,
+                                        imageVector = Icons.Default.Public,
                                         contentDescription = null,
-                                        tint = Color(0xFF1D4ED8),
-                                        modifier = Modifier.size(20.dp)
+                                        tint = Color(0xFF1877F2),
+                                        modifier = Modifier.size(22.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Social Publishing",
+                                        text = "Facebook Publishing",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF1E40AF)
@@ -571,76 +574,40 @@ fun ContentPreviewScreen(
 
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Facebook aur Instagram dono par alag-alag ya ek sath post karne ki suvidha:",
+                                text = "Is post ko direct aapke Facebook Page par publish karein:",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF1E3A8A)
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            // Connection Indicators
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            // Connection Indicator
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (metaConnection.isFacebookConnected) Color(0xFFDCFCE7) else Color(0xFFF3F4F6),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (metaConnection.isFacebookConnected) Color(0xFFDCFCE7) else Color(0xFFF3F4F6),
-                                    modifier = Modifier.weight(1f)
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Public,
-                                            contentDescription = null,
-                                            tint = if (metaConnection.isFacebookConnected) Color(0xFF166534) else Color.Gray,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (metaConnection.isFacebookConnected) {
-                                                metaConnection.facebookPage?.pageName ?: "FB Page"
-                                            } else {
-                                                "FB: Offline"
-                                            },
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (metaConnection.isFacebookConnected) Color(0xFF166534) else Color.Gray,
-                                            maxLines = 1
-                                        )
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (metaConnection.isInstagramConnected) Color(0xFFFCE7F3) else Color(0xFFF3F4F6),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.AccountCircle,
-                                            contentDescription = null,
-                                            tint = if (metaConnection.isInstagramConnected) Color(0xFF9D174D) else Color.Gray,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (metaConnection.isInstagramConnected) {
-                                                "@${metaConnection.instagramAccount?.username}"
-                                            } else {
-                                                "IG: Optional"
-                                            },
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (metaConnection.isInstagramConnected) Color(0xFF9D174D) else Color.Gray,
-                                            maxLines = 1
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Public,
+                                        contentDescription = null,
+                                        tint = if (metaConnection.isFacebookConnected) Color(0xFF166534) else Color(0xFF1877F2),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (metaConnection.isFacebookConnected) {
+                                            "Target Page: ${metaConnection.facebookPage?.pageName ?: "Official Page"} (Connected)"
+                                        } else {
+                                            "Target: Official Facebook Page (Auto-connect)"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (metaConnection.isFacebookConnected) Color(0xFF166534) else Color(0xFF1E40AF)
+                                    )
                                 }
                             }
 
@@ -660,8 +627,8 @@ fun ContentPreviewScreen(
                                         Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF065F46), modifier = Modifier.size(20.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text("Published Successfully!", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF065F46))
-                                            Text("Ref ID: ${content.facebookPostId}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF065F46))
+                                            Text("Published to Facebook Page!", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF065F46))
+                                            Text("Post ID: ${content.facebookPostId}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF065F46))
                                         }
                                         val uriHandler = LocalUriHandler.current
                                         TextButton(onClick = { uriHandler.openUri("https://www.facebook.com") }) {
@@ -670,101 +637,34 @@ fun ContentPreviewScreen(
                                     }
                                 }
                             } else {
-                                // Platform Selection Chips (Facebook Only, Instagram Only, Both)
-                                Text(
-                                    text = "Select Destination Platform:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1E3A8A)
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    FilterChip(
-                                        selected = selectedPublishTarget == PublishTargetPlatform.FACEBOOK_ONLY,
-                                        onClick = { selectedPublishTarget = PublishTargetPlatform.FACEBOOK_ONLY },
-                                        label = { Text("Facebook Only") },
-                                        leadingIcon = {
-                                            Icon(Icons.Default.Public, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        },
-                                        modifier = Modifier.weight(1f).testTag("chip_target_facebook_only")
-                                    )
-                                    FilterChip(
-                                        selected = selectedPublishTarget == PublishTargetPlatform.INSTAGRAM_ONLY,
-                                        onClick = { selectedPublishTarget = PublishTargetPlatform.INSTAGRAM_ONLY },
-                                        label = { Text("Instagram Only") },
-                                        leadingIcon = {
-                                            Icon(Icons.Default.AccountCircle, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        },
-                                        modifier = Modifier.weight(1f).testTag("chip_target_instagram_only")
-                                    )
-                                    FilterChip(
-                                        selected = selectedPublishTarget == PublishTargetPlatform.BOTH,
-                                        onClick = { selectedPublishTarget = PublishTargetPlatform.BOTH },
-                                        label = { Text("Both (FB+IG)") },
-                                        leadingIcon = {
-                                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        },
-                                        modifier = Modifier.weight(1f).testTag("chip_target_both")
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                // Main Publish Button for selected target
-                                val (buttonColor, buttonText) = when (selectedPublishTarget) {
-                                    PublishTargetPlatform.FACEBOOK_ONLY -> Color(0xFF1877F2) to "PUBLISH TO FACEBOOK PAGE"
-                                    PublishTargetPlatform.INSTAGRAM_ONLY -> Color(0xFFE1306C) to "PUBLISH TO INSTAGRAM"
-                                    PublishTargetPlatform.BOTH -> Color(0xFF4F46E5) to "PUBLISH TO BOTH (FB & INSTAGRAM)"
-                                }
-
+                                // Primary Action: Publish to Facebook Page
                                 Button(
                                     onClick = {
-                                        viewModel.publishWithTarget(content.id, selectedPublishTarget)
+                                        viewModel.publishToFacebook(content.id)
                                     },
                                     enabled = !isPublishing,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .testTag("btn_preview_publish_selected"),
-                                    colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
+                                        .testTag("btn_publish_post"),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = if (isPublishing) "Publishing..." else buttonText,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Direct Quick Buttons
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    OutlinedButton(
-                                        onClick = { viewModel.publishToFacebook(content.id) },
-                                        enabled = !isPublishing,
-                                        modifier = Modifier.weight(1f).testTag("btn_quick_publish_fb"),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF1877F2))
-                                    ) {
-                                        Text("Post Facebook", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                    }
-                                    OutlinedButton(
-                                        onClick = { viewModel.publishToInstagram(content.id) },
-                                        enabled = !isPublishing,
-                                        modifier = Modifier.weight(1f).testTag("btn_quick_publish_ig"),
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE1306C))
-                                    ) {
-                                        Text("Post Instagram", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                    if (isPublishing) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            color = Color.White,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Publishing to Facebook...", color = Color.White)
+                                    } else {
+                                        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "PUBLISH TO FACEBOOK PAGE",
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
                                     }
                                 }
                             }
@@ -778,33 +678,18 @@ fun ContentPreviewScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Text("Publishing / Review Failed", fontWeight = FontWeight.Bold, color = Color(0xFF991B1B))
+                            Text("Facebook Publish Failed", fontWeight = FontWeight.Bold, color = Color(0xFF991B1B))
                             Text(content.validationFailures ?: "Error during processing.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF991B1B))
                             Spacer(modifier = Modifier.height(10.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Button(
+                                onClick = { viewModel.publishToFacebook(content.id) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("btn_preview_retry_fb")
                             ) {
-                                Button(
-                                    onClick = { viewModel.publishToFacebook(content.id) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f).testTag("btn_preview_retry_fb")
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("RETRY FB", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                }
-                                Button(
-                                    onClick = { viewModel.publishToInstagram(content.id) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f).testTag("btn_preview_retry_ig")
-                                ) {
-                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("RETRY IG", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                }
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("RETRY PUBLISH TO FACEBOOK", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

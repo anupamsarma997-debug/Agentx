@@ -64,14 +64,11 @@ data class MetaConnectionState(
     val isAuthenticating: Boolean = false
 ) {
     val isFacebookConnected: Boolean
-        get() = (status == MetaConnectionStatus.CONNECTED || (facebookPage != null && status != MetaConnectionStatus.DISCONNECTED && status != MetaConnectionStatus.EXPIRED)) &&
-                facebookPage?.isConnected == true
+        get() = facebookPage != null && facebookPage.isConnected && status != MetaConnectionStatus.DISCONNECTED
 
     val isInstagramConnected: Boolean
-        get() = (status == MetaConnectionStatus.CONNECTED || (instagramAccount != null && status != MetaConnectionStatus.DISCONNECTED && status != MetaConnectionStatus.EXPIRED)) &&
-                instagramAccount?.isConnected == true &&
-                instagramAccount.isEligibleForPublishing
+        get() = false
 
     val isFullyConnected: Boolean
-        get() = isFacebookConnected && isInstagramConnected
+        get() = isFacebookConnected
 }

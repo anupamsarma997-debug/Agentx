@@ -890,33 +890,14 @@ fun QueueItemCard(
                     } else {
                         Button(
                             onClick = onPublishFacebook,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.testTag("btn_publish_fb_${item.id}")
                         ) {
                             Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text("FB", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                        Button(
-                            onClick = onPublishInstagram,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.testTag("btn_publish_ig_${item.id}")
-                        ) {
-                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Text("IG", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
-                        }
-                        OutlinedButton(
-                            onClick = onPublishBoth,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.testTag("btn_publish_both_${item.id}")
-                        ) {
-                            Text("BOTH", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("PUBLISH TO FB", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 } else if (item.generationStatusEnum == GenerationStatus.PUBLISHED) {
@@ -936,25 +917,14 @@ fun QueueItemCard(
                 } else if (item.generationStatusEnum == GenerationStatus.FAILED) {
                     Button(
                         onClick = onPublishFacebook,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.testTag("btn_retry_publish_fb_${item.id}")
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("RETRY FB", style = MaterialTheme.typography.labelSmall, color = Color.White)
-                    }
-                    Button(
-                        onClick = onPublishInstagram,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.testTag("btn_retry_publish_ig_${item.id}")
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
-                        Spacer(modifier = Modifier.width(3.dp))
-                        Text("RETRY IG", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("RETRY FB", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Button(

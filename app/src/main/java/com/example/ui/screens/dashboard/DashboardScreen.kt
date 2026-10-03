@@ -401,11 +401,10 @@ fun DashboardScreen(
                         }
                     }
 
-                    val (badgeText, badgeBg, badgeTextColor) = when {
-                        metaConnection.isFullyConnected -> Triple("CONNECTED", Color(0xFFDCFCE7), Color(0xFF166534))
-                        metaConnection.isFacebookConnected && !metaConnection.isInstagramConnected -> Triple("PARTIAL (Facebook connected)", Color(0xFFFEF3C7), Color(0xFF92400E))
-                        metaConnection.isInstagramConnected && !metaConnection.isFacebookConnected -> Triple("PARTIAL (Instagram connected)", Color(0xFFFEF3C7), Color(0xFF92400E))
-                        else -> Triple("NOT CONNECTED", Color(0xFFF3F4F6), Color(0xFF6B7280))
+                    val (badgeText, badgeBg, badgeTextColor) = if (metaConnection.isFacebookConnected) {
+                        Triple("CONNECTED", Color(0xFFDCFCE7), Color(0xFF166534))
+                    } else {
+                        Triple("NOT CONNECTED", Color(0xFFF3F4F6), Color(0xFF6B7280))
                     }
 
                     Surface(
@@ -444,31 +443,6 @@ fun DashboardScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = if (metaConnection.isFacebookConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Instagram Status
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Instagram:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = if (metaConnection.isInstagramConnected) {
-                            "@${metaConnection.instagramAccount?.username}"
-                        } else {
-                            "Not connected"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (metaConnection.isInstagramConnected) Color(0xFFE1306C) else MaterialTheme.colorScheme.onSurface
                     )
                 }
 

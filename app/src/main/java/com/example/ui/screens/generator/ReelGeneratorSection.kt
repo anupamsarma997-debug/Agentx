@@ -150,7 +150,7 @@ fun ReelGeneratorSection(
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        text = "Short-form vertical video plans (Instagram & Facebook Reels)",
+                        text = "Short-form vertical video plans (Facebook Reels)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

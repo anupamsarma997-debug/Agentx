@@ -16,6 +16,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 /**
  * Official Meta OAuth configuration requirements:
@@ -344,12 +345,13 @@ class MetaOAuthClient(
     suspend fun connectWithPageAccessToken(pageToken: String): Result<Pair<FacebookPageInfo, InstagramAccountInfo?>> = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
-            // Initial validation queries /me for basic Page info (id and name) only
-            val url = URL("https://graph.facebook.com/v20.0/me?fields=id,name&access_token=$pageToken")
+            val encodedToken = URLEncoder.encode(pageToken, "UTF-8")
+            val url = URL("https://graph.facebook.com/v20.0/me?fields=id,name,category&access_token=$encodedToken")
             conn = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 10000
+                connectTimeout = 12000
                 readTimeout = 15000
                 requestMethod = "GET"
+                setRequestProperty("Authorization", "Bearer $pageToken")
             }
             val responseCode = conn.responseCode
             val stream = if (responseCode in 200..299) conn.inputStream else conn.errorStream
@@ -413,14 +415,8 @@ class MetaOAuthClient(
                 hasAccessTokenRef = true
             )
 
-            // Instagram account discovery is completely optional and non-blocking.
-            // Any HTTP 400, permission, or missing link error is safely swallowed, returning null.
-            val ig: InstagramAccountInfo? = try {
-                fetchInstagramForPage(pageId, effectivePageToken).getOrNull()
-            } catch (e: Throwable) {
-                android.util.Log.w("MetaOAuthClient", "Non-blocking Instagram discovery error: ${e.message}")
-                null
-            }
+            // Only Facebook Page is required and used
+            val ig: InstagramAccountInfo? = null
 
             Result.success(fbPage to ig)
         } catch (e: Exception) {

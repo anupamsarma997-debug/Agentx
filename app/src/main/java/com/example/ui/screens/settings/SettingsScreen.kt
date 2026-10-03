@@ -176,19 +176,17 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "META SOCIAL ACCOUNTS",
+                    text = "FACEBOOK PAGE CONNECTION",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = if (metaConnection.isFullyConnected) {
-                        "Connected: ${metaConnection.facebookPage?.pageName} & @${metaConnection.instagramAccount?.username}"
-                    } else if (metaConnection.isFacebookConnected) {
-                        "Connected: ${metaConnection.facebookPage?.pageName} (Instagram pending)"
+                    text = if (metaConnection.isFacebookConnected) {
+                        "Connected: ${metaConnection.facebookPage?.pageName}"
                     } else {
-                        "Connect your Facebook Page & Instagram Professional account for scheduled publishing."
+                        "Connect your Facebook Page for automated scheduled publishing."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
@@ -203,7 +201,7 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.Default.Public, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Facebook Page + Instagram")
+                    Text("Facebook Page Settings")
                 }
             }
         }
