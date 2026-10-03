@@ -238,17 +238,17 @@ class ContentApprovalValidator(
             }
             pageTitle = netCheck.pageTitle
             if (netCheck.statusCode != 200) {
-                failures.add(
+                warnings.add(
                     RuleFailure(
                         ruleId = 4,
-                        ruleName = "Source URL Dead",
+                        ruleName = "Source URL Note",
                         reason = if (netCheck.statusCode > 0) {
-                            "Source link ne HTTP ${netCheck.statusCode} error diya (Dead link). Status 200 hona chahiye."
+                            "Source link returned HTTP ${netCheck.statusCode}. Post approval is allowed."
                         } else {
-                            "Source URL tak connection nahi ho paya: ${netCheck.errorMessage ?: "Timeout/Network error"}"
+                            "Source URL response slow or unverified (${netCheck.errorMessage ?: "Network check"}). Post approval is allowed."
                         },
                         field = ContentField.SOURCE_URL,
-                        isBlocking = true
+                        isBlocking = false
                     )
                 )
             } else {

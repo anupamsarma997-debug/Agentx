@@ -528,7 +528,7 @@ fun ContentPreviewScreen(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Social Publishing Card (Facebook / Instagram / Both)
-                if (content.generationStatusEnum == GenerationStatus.APPROVED) {
+                if (content.generationStatusEnum != GenerationStatus.PUBLISHED) {
                     Card(
                         modifier = Modifier.fillMaxWidth().testTag("social_publishing_card"),
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
@@ -560,7 +560,7 @@ fun ContentPreviewScreen(
                                     color = Color(0xFFDBEAFE)
                                 ) {
                                     Text(
-                                        text = "APPROVED",
+                                        text = content.generationStatusEnum.displayName.uppercase(),
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
@@ -845,7 +845,7 @@ fun ContentPreviewScreen(
                             ) {
                                 Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("APPROVE")
+                                Text("APPROVE & AUTO-POST FB")
                             }
 
                             OutlinedButton(

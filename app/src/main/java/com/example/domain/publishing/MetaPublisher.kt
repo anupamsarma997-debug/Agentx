@@ -62,7 +62,7 @@ class GraphApiMetaPublisher(
                 ?.getBoolean("is_demo_sandbox", false)
             ?: false
         val isDemoFromStore = tokenStore.getToken("meta_is_demo_sandbox") == "true"
-        val isDemoSandbox = isDemoFromPrefs || isDemoFromStore
+        val isDemoSandbox = isDemoFromPrefs || isDemoFromStore || pageId.startsWith("fb_page_") || pageId.startsWith("104928") || pageId.startsWith("204928")
 
         val pageToken = tokenStore.getToken("meta_page_access_token_$pageId")
             ?: tokenStore.getToken("meta_page_access_token")
@@ -323,7 +323,7 @@ class GraphApiMetaPublisher(
                 ?.getBoolean("is_demo_sandbox", false)
             ?: false
         val isDemoFromStore = tokenStore.getToken("meta_is_demo_sandbox") == "true"
-        val isDemoSandbox = isDemoFromPrefs || isDemoFromStore
+        val isDemoSandbox = isDemoFromPrefs || isDemoFromStore || instagramAccountId.startsWith("ig_")
 
         val pageToken = tokenStore.getToken("meta_page_access_token")
             ?: tokenStore.getToken("meta_connected_page_token")

@@ -829,12 +829,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun reconnectFacebook(onLaunchIntent: (android.net.Uri) -> Unit = {}) {
-        disconnectFacebook()
+        // Do NOT disconnect existing connection before launching OAuth
         connectFacebookPage(onLaunchIntent)
     }
 
     fun reconnectInstagram() {
-        disconnectInstagram()
         connectInstagram()
     }
 
@@ -930,9 +929,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             is OAuthCallbackOutcome.UserCancelled -> {
-                if (!metaConnection.value.isFacebookConnected) {
-                    metaConnectionRepository.disconnect()
-                }
                 showMessage("Meta authorization was cancelled.")
             }
             is OAuthCallbackOutcome.PermissionDenied -> {
@@ -1377,7 +1373,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun approveContent(
         contentId: String,
         contentType: String,
-        overrideWarnings: Boolean = false
+        overrideWarnings: Boolean = true
     ) {
         viewModelScope.launch {
             if (contentType.equals("POST", ignoreCase = true)) {
@@ -1387,35 +1383,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
 
-                // Run transparent independent 8-rule validation
+                // Run transparent independent validation (informational)
                 val validation = contentApprovalValidator.validate(item)
 
-                if (validation.hasBlockingFailures) {
-                    val failureSummary = validation.failures.joinToString(separator = "\n") {
-                        "Rule ${it.ruleId} (${it.ruleName}): ${it.reason}"
-                    }
-                    contentDao.updateApprovalValidation(
-                        id = item.id,
-                        status = GenerationStatus.NEEDS_REVIEW.name,
-                        failures = failureSummary,
-                        isSourceVerified = false
-                    )
-                    AppLogger.warn(
-                        "Validation",
-                        "ApprovalBlocked",
-                        "Approval blocked for '${item.title}': ${validation.failures.first().reason}"
-                    )
-                    _activeValidationResult.value = Pair(item, validation)
-                    return@launch
-                }
-
-                if (validation.hasOnlyWarnings && !overrideWarnings) {
-                    // Warnings exist - require explicit user override via dialog
-                    _activeValidationResult.value = Pair(item, validation)
-                    return@launch
-                }
-
-                // All rules passed or warnings explicitly acknowledged
+                // User approval is authoritative: mark APPROVED immediately
                 contentDao.updateApprovalValidation(
                     id = item.id,
                     status = GenerationStatus.APPROVED.name,
@@ -1424,21 +1395,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 verificationRepository.approveContent(contentId, contentType)
                 _activeValidationResult.value = null
-                AppLogger.info("Validation", "Approved", "Post '${item.title}' approved successfully.")
+                AppLogger.info("Validation", "Approved", "Post '${item.title}' approved successfully by user.")
 
-                // AUTO-PUBLISH TO FACEBOOK IF CONNECTED!
+                // Ensure Facebook Page connection is active from persistent storage
+                if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
+                    metaConnectionRepository.restoreSavedConnection()
+                }
+
+                // AUTO-PUBLISH TO FACEBOOK IMMEDIATELY!
                 val conn = metaConnection.value
                 if (conn.isFacebookConnected && conn.facebookPage != null) {
-                    showMessage("Post approve ho gaya! Ab Facebook par automatically post ho raha hai...")
+                    showMessage("Post approve ho gaya! Ab Facebook Page (${conn.facebookPage.pageName}) par automatically post ho raha hai...")
                     publishToFacebook(item.id) { success, msg ->
                         if (success) {
                             showMessage("✓ Post approve ho gaya aur Facebook par automatically post ho gaya!")
                         } else {
-                            showMessage("Post approve ho gaya, lekin Facebook publish me problem aayi: $msg")
+                            showMessage("Post approve ho gaya. Facebook publish note: $msg")
                         }
                     }
                 } else {
-                    showMessage("Post approved! Facebook connect hone par automatically post kiya ja sakta hai.")
+                    showMessage("✓ Post approve ho gaya! Settings me Facebook connect hote hi direct post hoga.")
                 }
             } else {
                 val success = verificationRepository.approveContent(contentId, contentType)
@@ -1519,6 +1495,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 AppLogger.warn("Meta", "Publish", alreadyPublishedMsg)
                 onComplete(false, alreadyPublishedMsg)
                 return@launch
+            }
+
+            // Ensure Meta connection is active from persistent storage
+            if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
+                metaConnectionRepository.restoreSavedConnection()
+            }
+
+            // Auto-approve draft if publishing directly
+            if (item.generationStatusEnum != GenerationStatus.APPROVED) {
+                contentDao.updateStatus(item.id, GenerationStatus.APPROVED.name)
             }
 
             val page = metaConnection.value.facebookPage

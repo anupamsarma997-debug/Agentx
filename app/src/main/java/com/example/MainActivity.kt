@@ -52,6 +52,11 @@ class MainActivity : ComponentActivity() {
         handleIncomingOAuthIntent(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        appViewModel.refreshMetaConnection()
+    }
+
     private fun handleIncomingOAuthIntent(intent: Intent?) {
         val uri = intent?.data ?: return
         if (uri.scheme == "socialagent" && (uri.host == "meta-callback" || uri.host == "callback")) {

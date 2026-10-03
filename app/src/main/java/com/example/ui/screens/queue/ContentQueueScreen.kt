@@ -959,14 +959,26 @@ fun QueueItemCard(
                 } else {
                     Button(
                         onClick = onApprove,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534)),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.testTag("btn_approve_${item.id}")
                     ) {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("APPROVE", style = MaterialTheme.typography.labelSmall)
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("APPROVE & POST FB", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    Button(
+                        onClick = onPublishFacebook,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_direct_post_fb_${item.id}")
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("POST FB", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -976,8 +988,8 @@ fun QueueItemCard(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.testTag("btn_reject_${item.id}")
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(13.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text("REJECT", style = MaterialTheme.typography.labelSmall)
                     }
                 }
