@@ -68,6 +68,8 @@ fun ReelGeneratorSection(
 
     var selectedSourceType by remember { mutableStateOf("Verified Opportunity") }
     val sourceOptions = listOf(
+        "Creator & YouTuber News",
+        "MSME & Government Schemes",
         "Verified Opportunity",
         "Verified News",
         "Verified Content",
@@ -175,6 +177,16 @@ fun ReelGeneratorSection(
                         onClick = {
                             selectedSourceType = opt
                             when (opt) {
+                                "Creator & YouTuber News" -> {
+                                    generalTopicText = "NewsBoy & Neon Man Style Creator Updates"
+                                    generalContextText = "Fast short news update on top Indian YouTubers, viral controversies, CarryMinati, BB Ki Vines, and creator milestones."
+                                    selectedReelType = ReelType.NEWS_REEL
+                                }
+                                "MSME & Government Schemes" -> {
+                                    generalTopicText = "Bharat Sarkar MSME PMEGP & Subsidy Opportunity"
+                                    generalContextText = "Official Government of India micro-enterprise loan subsidies up to ₹50 Lakhs and Udyam paperless registration."
+                                    selectedReelType = ReelType.OPPORTUNITY_REEL
+                                }
                                 "Meme Draft" -> selectedReelType = ReelType.MEME_REEL
                                 "Verified News" -> selectedReelType = ReelType.NEWS_REEL
                                 "Verified Opportunity" -> selectedReelType = ReelType.OPPORTUNITY_REEL

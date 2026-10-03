@@ -68,3 +68,10 @@ enum class ContentLength(val displayName: String, val wordCountGuide: String, va
         }
     }
 }
+
+enum class PublishTargetPlatform(val displayName: String, val subtitle: String) {
+    FACEBOOK_ONLY("Facebook Only", "Publish only to connected Facebook Page"),
+    INSTAGRAM_ONLY("Instagram Only", "Publish only to connected Instagram account"),
+    BOTH("Both (Facebook & Instagram)", "Publish simultaneously to both platforms")
+}
+

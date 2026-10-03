@@ -27,6 +27,7 @@ import com.example.data.model.content.ContentLength
 import com.example.data.model.content.ContentPlatform
 import com.example.data.model.content.ContentType
 import com.example.data.model.content.GenerationStatus
+import com.example.data.model.content.PublishTargetPlatform
 import com.example.data.model.meta.FacebookPageInfo
 import com.example.data.model.meta.InstagramAccountInfo
 import com.example.data.model.meta.InstagramAccountType
@@ -313,6 +314,23 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         metaConnectionRepository.restoreSavedConnection()
         // Start background automation scheduler
         startAutomationScheduler()
+        // Auto-seed initial opportunities on first launch if empty
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (opportunityDao.countOpportunitiesSync() == 0) {
+                    val s = settings.value
+                    opportunityRepository.runScoutScan(
+                        assamEnabled = true,
+                        northeastEnabled = true,
+                        indiaEnabled = true,
+                        internationalEnabled = true,
+                        newsEnabled = true
+                    )
+                }
+            } catch (e: Exception) {
+                AppLogger.warn("Scout", "InitSeed", "Initial scout seed notice: ${e.localizedMessage}")
+            }
+        }
     }
 
     fun showMessage(message: String) {
@@ -1489,19 +1507,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         _activeValidationResult.value = null
     }
 
-    fun publishToFacebook(
-        contentId: String,
+    fun publishPostImmediately(
+        item: ContentEntity,
+        target: PublishTargetPlatform = PublishTargetPlatform.BOTH,
         onComplete: (Boolean, String) -> Unit = { _, _ -> }
     ) {
         viewModelScope.launch {
-            val item = contentDao.getContentByIdSync(contentId)
-            if (item == null) {
-                val msg = "Post nahi mila."
-                showMessage(msg)
-                onComplete(false, msg)
-                return@launch
-            }
-
             if (!item.facebookPostId.isNullOrBlank()) {
                 val alreadyPublishedMsg = "Ye post pehle se published hai (Post ID: ${item.facebookPostId}). Double posting prevented."
                 showMessage(alreadyPublishedMsg)
@@ -1515,12 +1526,35 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val isFbConnected = metaConnection.value.isFacebookConnected && page != null
             val isIgConnected = metaConnection.value.isInstagramConnected && ig != null
 
-            if (!isFbConnected && !isIgConnected) {
-                val notConnectedMsg = "Facebook Page ya Instagram account connect nahi hai. Kripya pehle Settings me connect karein."
-                showMessage(notConnectedMsg)
-                AppLogger.warn("Meta", "Publish", notConnectedMsg)
-                onComplete(false, notConnectedMsg)
-                return@launch
+            // Validate connections according to target platform choice
+            when (target) {
+                PublishTargetPlatform.FACEBOOK_ONLY -> {
+                    if (!isFbConnected || page == null) {
+                        val msg = "Facebook Page connect nahi hai. Kripya Settings me Facebook Page connect karein."
+                        showMessage(msg)
+                        AppLogger.warn("Meta", "Publish", msg)
+                        onComplete(false, msg)
+                        return@launch
+                    }
+                }
+                PublishTargetPlatform.INSTAGRAM_ONLY -> {
+                    if (!isIgConnected || ig == null) {
+                        val msg = "Instagram account connect nahi hai. Kripya Settings me Instagram Professional connect karein."
+                        showMessage(msg)
+                        AppLogger.warn("Meta", "Publish", msg)
+                        onComplete(false, msg)
+                        return@launch
+                    }
+                }
+                PublishTargetPlatform.BOTH -> {
+                    if (!isFbConnected && !isIgConnected) {
+                        val notConnectedMsg = "Facebook Page ya Instagram account connect nahi hai. Kripya pehle Settings me connect karein."
+                        showMessage(notConnectedMsg)
+                        AppLogger.warn("Meta", "Publish", notConnectedMsg)
+                        onComplete(false, notConnectedMsg)
+                        return@launch
+                    }
+                }
             }
 
             // Pre-publish URL verification: warn if offline/slow but DO NOT abort publishing
@@ -1550,9 +1584,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             var igPostId: String? = null
             val errors = mutableListOf<String>()
 
-            // 1. Publish to Facebook Page if connected
-            if (isFbConnected && page != null) {
-                AppLogger.info("Meta", "Publish", "Publishing post '${item.title}' to Page ${page.pageName} (${page.pageId})")
+            val shouldPublishFb = (target == PublishTargetPlatform.FACEBOOK_ONLY || target == PublishTargetPlatform.BOTH) && isFbConnected && page != null
+            val shouldPublishIg = (target == PublishTargetPlatform.INSTAGRAM_ONLY || target == PublishTargetPlatform.BOTH) && isIgConnected && ig != null
+
+            // 1. Publish to Facebook Page if requested
+            if (shouldPublishFb && page != null) {
+                AppLogger.info("Meta", "Publish", "Publishing post '${item.title}' to Facebook Page ${page.pageName} (${page.pageId})")
                 val result = metaPublisher.publishFacebookPost(
                     pageId = page.pageId,
                     content = fullMessage,
@@ -1572,8 +1609,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-            // 2. Publish to Instagram if connected
-            if (isIgConnected && ig != null) {
+            // 2. Publish to Instagram if requested
+            if (shouldPublishIg && ig != null) {
                 AppLogger.info("Meta", "Publish", "Publishing post '${item.title}' to Instagram @${ig.username}")
                 val igResult = metaPublisher.publishInstagramPhoto(
                     instagramAccountId = ig.instagramAccountId,
@@ -1606,8 +1643,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 ).joinToString(" | ")
                 contentDao.updateFacebookPublished(item.id, combinedId)
                 val platforms = listOfNotNull(
-                    fbPostId?.let { "Facebook Page" },
-                    igPostId?.let { "Instagram (@${ig?.username})" }
+                    fbPostId?.let { "Facebook Page (${page?.pageName ?: ""})" },
+                    igPostId?.let { "Instagram (@${ig?.username ?: ""})" }
                 ).joinToString(" & ")
                 val successMsg = "Successfully published to $platforms! (ID: $combinedId)"
                 AppLogger.info("Meta", "Publish", successMsg)
@@ -1624,6 +1661,44 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             _isPublishing.value = false
         }
+    }
+
+    fun publishWithTarget(
+        contentId: String,
+        target: PublishTargetPlatform,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val item = contentDao.getContentByIdSync(contentId)
+            if (item == null) {
+                val msg = "Post nahi mila."
+                showMessage(msg)
+                onComplete(false, msg)
+                return@launch
+            }
+            publishPostImmediately(item, target, onComplete)
+        }
+    }
+
+    fun publishToFacebook(
+        contentId: String,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        publishWithTarget(contentId, PublishTargetPlatform.FACEBOOK_ONLY, onComplete)
+    }
+
+    fun publishToInstagram(
+        contentId: String,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        publishWithTarget(contentId, PublishTargetPlatform.INSTAGRAM_ONLY, onComplete)
+    }
+
+    fun publishToBoth(
+        contentId: String,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        publishWithTarget(contentId, PublishTargetPlatform.BOTH, onComplete)
     }
 
     fun sendTestPostToFacebookPage(onResult: (Boolean, String) -> Unit = { _, _ -> }) {

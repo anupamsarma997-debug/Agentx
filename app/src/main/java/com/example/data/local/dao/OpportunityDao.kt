@@ -65,6 +65,9 @@ interface OpportunityDao {
     @Query("SELECT COUNT(*) FROM opportunities")
     fun countOpportunities(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM opportunities")
+    suspend fun countOpportunitiesSync(): Int
+
     @Query("SELECT COUNT(*) FROM opportunities WHERE verificationStatus = :status")
     fun countByVerificationStatus(status: String): Flow<Int>
 }

@@ -47,7 +47,7 @@ class GraphApiMetaPublisher(
 ) : MetaPublisher {
 
     companion object {
-        const val GRAPH_API_VERSION = "v26.0"
+        const val GRAPH_API_VERSION = "v20.0"
     }
 
     override suspend fun publishFacebookPost(
@@ -291,6 +291,12 @@ class GraphApiMetaPublisher(
                     postUrl = postUrl
                 )
             } else {
+                // If posting with link failed, retry immediately with message only as a fallback
+                if (!linkUrl.isNullOrBlank()) {
+                    AppLogger.warn("Meta", "Publish", "Posting with link failed ($responseCode). Retrying without link parameter...")
+                    conn?.disconnect()
+                    return publishFeedPost(pageId, pageToken, content, null)
+                }
                 val (code, subcode, msg) = parseGraphApiError(respText)
                 val fullErrMsg = "Graph API Error (Code: $code${if (subcode > 0) ", Subcode: $subcode" else ""}): $msg"
                 AppLogger.error("Meta", "Publish", "Publish failed: $fullErrMsg")
