@@ -44,6 +44,7 @@ enum class MemeGenerationStatus(val displayName: String) {
     DRAFT("Draft"),
     REVIEW_REQUIRED("Review Required"),
     APPROVED("Approved"),
+    PUBLISHED("Published"),
     REJECTED("Rejected"),
     FAILED("Failed");
 

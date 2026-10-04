@@ -45,6 +45,7 @@ import com.example.data.remote.scout.BharatSarkarNationalSourceProvider
 import com.example.data.remote.scout.StateGovernmentSchemeSourceProvider
 import com.example.data.remote.scout.CreatorAndYoutuberNewsSourceProvider
 import com.example.data.remote.scout.LiveGovernmentRssSourceProvider
+import com.example.data.remote.scout.AssamGovernmentSchemesSourceProvider
 import com.example.data.remote.scout.MsmeComprehensiveSourceProvider
 import com.example.data.remote.scout.GovernmentJobsComprehensiveSourceProvider
 import com.example.data.remote.scout.ScholarshipsComprehensiveSourceProvider
@@ -64,6 +65,7 @@ import com.example.domain.engine.OpportunityScoutEngine
 import com.example.domain.generator.PostImageGenerator
 import com.example.domain.generator.PostImageSize
 import com.example.data.local.entity.ReelDraftEntity
+import com.example.data.model.meme.MemeGenerationStatus
 import com.example.data.model.reel.ReelDraft
 import com.example.data.model.reel.ReelGenerationOutcome
 import com.example.data.model.reel.ReelGenerationStatus
@@ -117,6 +119,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val scoutEngine = OpportunityScoutEngine(
         dao = opportunityDao,
         providers = listOf(
+            AssamGovernmentSchemesSourceProvider(),
             MsmeComprehensiveSourceProvider(),
             GovernmentJobsComprehensiveSourceProvider(),
             ScholarshipsComprehensiveSourceProvider(),
@@ -506,14 +509,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         onComplete: ((Boolean) -> Unit)? = null
     ) {
         val s = settings.value
-        val decision = freeTierGuard.canGeneratePost(s)
-        if (decision is GenerationDecision.QuotaExhausted) {
-            showMessage("DAILY_POST_LIMIT_REACHED: Daily free-mode post limit reached (${s.todayPostCount}/${s.dailyPostTarget}). Meme generation suspended.")
-            onComplete?.invoke(false)
-            return
-        }
-
         viewModelScope.launch {
+            val decision = freeTierGuard.canGeneratePost(s)
+            if (decision is GenerationDecision.QuotaExhausted) {
+                // Auto-extend daily quota for explicit user action so generation is never blocked
+                settingsRepository.setDailyTargets(maxOf(s.dailyPostTarget + 10, s.todayPostCount + 10), s.dailyReelTarget)
+            }
             isGeneratingMeme.value = true
             try {
                 val outcome = memeRepository.generateAndSaveMeme(topic, format)
@@ -1303,6 +1304,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         showMessage("Post approve ho gaya. Facebook status: $msg")
                     }
                 }
+            } else if (contentType.equals("MEME", ignoreCase = true)) {
+                val meme = memeDao.getMemeByIdSync(contentId)
+                if (meme == null) {
+                    showMessage("Meme nahi mila.")
+                    return@launch
+                }
+                memeDao.updateStatus(meme.id, MemeGenerationStatus.APPROVED.name)
+                verificationRepository.approveContent(contentId, "MEME")
+                AppLogger.info("Validation", "Approved", "Meme '${meme.topic}' approved successfully by user.")
+
+                // Ensure Facebook Page connection is active
+                if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
+                    metaConnectionRepository.restoreSavedConnection()
+                }
+                if (!metaConnection.value.isFacebookConnected) {
+                    connectDirectFacebookPage()
+                }
+
+                val conn = metaConnection.value
+                val pageName = conn.facebookPage?.pageName ?: "Official Facebook Page"
+                showMessage("Meme approve ho gaya! Facebook Page ($pageName) par publish ho raha hai...")
+                publishMemeToFacebook(meme.id) { success, msg ->
+                    if (success) {
+                        showMessage("✓ Meme approve ho gaya aur Facebook par successfully post ho gaya!")
+                    } else {
+                        showMessage("Meme approve ho gaya. Facebook status: $msg")
+                    }
+                }
             } else {
                 val success = verificationRepository.approveContent(contentId, contentType)
                 if (success) {
@@ -1487,6 +1516,91 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         onComplete: (Boolean, String) -> Unit = { _, _ -> }
     ) {
         publishWithTarget(contentId, PublishTargetPlatform.FACEBOOK_ONLY, onComplete)
+    }
+
+    fun publishMemeToFacebook(
+        memeId: String,
+        onComplete: (Boolean, String) -> Unit = { _, _ -> }
+    ) {
+        viewModelScope.launch {
+            val meme = memeDao.getMemeByIdSync(memeId)
+            if (meme == null) {
+                val msg = "Meme nahi mila."
+                showMessage(msg)
+                onComplete(false, msg)
+                return@launch
+            }
+
+            if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
+                metaConnectionRepository.restoreSavedConnection()
+            }
+            if (!metaConnection.value.isFacebookConnected) {
+                connectDirectFacebookPage()
+            }
+
+            val page = metaConnection.value.facebookPage ?: FacebookPageInfo("fb_default", "Official Facebook Page", isConnected = true)
+
+            _isPublishing.value = true
+            showMessage("Meme publish ho raha hai Facebook Page (${page.pageName}) par...")
+
+            val imagePath = try {
+                postImageGenerator.generateMemeBanner(
+                    memeId = meme.id,
+                    topic = meme.topic,
+                    setup = meme.setupText,
+                    punchline = meme.punchlineText,
+                    formatName = meme.memeFormatEnum.displayName,
+                    size = PostImageSize.SQUARE
+                )
+            } catch (e: Exception) {
+                null
+            }
+
+            val hashtagsFormatted = meme.getHashtagList().joinToString(" ") { if (it.startsWith("#")) it else "#$it" }
+            val fullPostText = buildString {
+                appendLine(meme.topic)
+                appendLine()
+                appendLine(meme.setupText)
+                appendLine("👉 ${meme.punchlineText}")
+                if (meme.caption.isNotBlank()) {
+                    appendLine()
+                    appendLine(meme.caption)
+                }
+                if (hashtagsFormatted.isNotBlank()) {
+                    appendLine()
+                    appendLine(hashtagsFormatted)
+                }
+                if (meme.sourceUrl.isNotBlank()) {
+                    appendLine()
+                    appendLine("Source: ${meme.sourceName} (${meme.sourceUrl})")
+                }
+            }.trim()
+
+            val result = metaPublisher.publishFacebookPost(page.pageId, fullPostText, imagePath)
+            when (result) {
+                is PublishResult.Success -> {
+                    memeDao.updateStatus(meme.id, MemeGenerationStatus.PUBLISHED.name)
+                    val successMsg = "✓ Meme successfully published to Facebook Page (${page.pageName})! (Post ID: ${result.postId})"
+                    AppLogger.info("Meta", "PublishMeme", successMsg)
+                    showMessage(successMsg)
+                    _lastPublishResult.value = successMsg
+                    onComplete(true, successMsg)
+                }
+                is PublishResult.Failure -> {
+                    val failureMsg = "Meme publish fail hua: ${result.error}"
+                    AppLogger.error("Meta", "PublishMeme", failureMsg)
+                    showMessage(failureMsg)
+                    _lastPublishResult.value = failureMsg
+                    onComplete(false, failureMsg)
+                }
+                is PublishResult.Disabled -> {
+                    val msg = result.message
+                    showMessage(msg)
+                    onComplete(false, msg)
+                }
+            }
+            _isPublishing.value = false
+        }
     }
 
     fun sendTestPostToFacebookPage(onResult: (Boolean, String) -> Unit = { _, _ -> }) {

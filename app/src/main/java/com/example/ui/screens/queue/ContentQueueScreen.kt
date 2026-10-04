@@ -171,7 +171,11 @@ fun ContentQueueScreen(
             meme = meme,
             onDismiss = { activePreviewMeme = null },
             onApprove = {
-                viewModel.updateMemeStatus(meme.id, MemeGenerationStatus.APPROVED)
+                viewModel.approveContent(meme.id, "MEME")
+                activePreviewMeme = null
+            },
+            onPublishFacebook = {
+                viewModel.publishMemeToFacebook(meme.id)
                 activePreviewMeme = null
             },
             onReject = {
@@ -389,6 +393,7 @@ fun ContentQueueScreen(
                         onVerify = { onNavigateToVerification(meme.id, "MEME") },
                         onEdit = { activePreviewMeme = meme },
                         onApprove = { viewModel.approveContent(meme.id, "MEME") },
+                        onPublishFacebook = { viewModel.publishMemeToFacebook(meme.id) },
                         onReject = { viewModel.rejectContent(meme.id, "MEME", RejectionReason.USER_REJECTED) },
                         onRegenerate = { memeToRegenerate = meme },
                         onDelete = { viewModel.deleteMeme(meme.id) }
@@ -423,6 +428,7 @@ fun MemeQueueItemCard(
     onVerify: () -> Unit = {},
     onEdit: () -> Unit,
     onApprove: () -> Unit,
+    onPublishFacebook: () -> Unit = {},
     onReject: () -> Unit,
     onRegenerate: () -> Unit,
     onDelete: () -> Unit,
@@ -582,22 +588,62 @@ fun MemeQueueItemCard(
                     Text("EDIT", style = MaterialTheme.typography.labelSmall)
                 }
 
-                val canApprove = record?.finalStatusEnum != FinalVerificationStatus.BLOCKED &&
-                    record?.finalStatusEnum != FinalVerificationStatus.EXPIRED &&
-                    record?.finalStatusEnum != FinalVerificationStatus.FAILED &&
-                    record?.sourceUrlValid != false &&
-                    record?.safetyPassed != false
-                Button(
-                    onClick = onApprove,
-                    enabled = canApprove,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534)),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("btn_approve_meme_${meme.id}")
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(3.dp))
-                    Text("APPROVE", style = MaterialTheme.typography.labelSmall)
+                if (meme.generationStatusEnum == MemeGenerationStatus.PUBLISHED) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFD1FAE5)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF065F46), modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("PUBLISHED", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF065F46))
+                        }
+                    }
+                } else if (meme.generationStatusEnum == MemeGenerationStatus.APPROVED) {
+                    Button(
+                        onClick = onPublishFacebook,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_publish_fb_meme_${meme.id}")
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("PUBLISH TO FB", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    val canApprove = record?.finalStatusEnum != FinalVerificationStatus.BLOCKED &&
+                        record?.finalStatusEnum != FinalVerificationStatus.EXPIRED &&
+                        record?.finalStatusEnum != FinalVerificationStatus.FAILED &&
+                        record?.sourceUrlValid != false &&
+                        record?.safetyPassed != false
+                    Button(
+                        onClick = onApprove,
+                        enabled = canApprove,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_approve_meme_${meme.id}")
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("APPROVE & POST FB", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    Button(
+                        onClick = onPublishFacebook,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_direct_post_fb_meme_${meme.id}")
+                    ) {
+                        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("FB POST", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    }
                 }
 
                 OutlinedButton(
@@ -642,6 +688,7 @@ fun MemeStatusBadge(status: MemeGenerationStatus, modifier: Modifier = Modifier)
         MemeGenerationStatus.DRAFT -> Pair(Color(0xFFE3F2FD), Color(0xFF1565C0))
         MemeGenerationStatus.REVIEW_REQUIRED -> Pair(Color(0xFFFFF8E1), Color(0xFFF57F17))
         MemeGenerationStatus.APPROVED -> Pair(Color(0xFFE8F5E9), Color(0xFF2E7D32))
+        MemeGenerationStatus.PUBLISHED -> Pair(Color(0xFFE8F5E9), Color(0xFF1B5E20))
         MemeGenerationStatus.REJECTED -> Pair(Color(0xFFFFEBEE), Color(0xFFC62828))
         MemeGenerationStatus.FAILED -> Pair(Color(0xFFFFEBEE), Color(0xFFB71C1C))
     }

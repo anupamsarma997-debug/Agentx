@@ -11,10 +11,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface OpportunityDao {
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOpportunity(opportunity: OpportunityEntity): Long
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOpportunities(opportunities: List<OpportunityEntity>): List<Long>
 
     @Update
@@ -23,14 +23,17 @@ interface OpportunityDao {
     @Query("SELECT * FROM opportunities ORDER BY discoveredAt DESC LIMIT :limit")
     fun getLatestOpportunities(limit: Int = 100): Flow<List<OpportunityEntity>>
 
-    @Query("SELECT * FROM opportunities WHERE isExpired = 0 AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
-    fun getActiveOpportunities(limit: Int = 100): Flow<List<OpportunityEntity>>
+    @Query("SELECT * FROM opportunities WHERE verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
+    fun getActiveOpportunities(limit: Int = 150): Flow<List<OpportunityEntity>>
 
-    @Query("SELECT * FROM opportunities WHERE category = :category AND isExpired = 0 ORDER BY discoveredAt DESC LIMIT :limit")
+    @Query("SELECT * FROM opportunities WHERE category = :category AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
     fun getOpportunitiesByCategory(category: String, limit: Int = 100): Flow<List<OpportunityEntity>>
 
-    @Query("SELECT * FROM opportunities WHERE region = :region AND isExpired = 0 ORDER BY discoveredAt DESC LIMIT :limit")
+    @Query("SELECT * FROM opportunities WHERE region = :region AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
     fun getOpportunitiesByRegion(region: String, limit: Int = 100): Flow<List<OpportunityEntity>>
+
+    @Query("UPDATE opportunities SET isExpired = 0, verificationStatus = 'VERIFIED' WHERE verificationStatus = 'EXPIRED' OR isExpired = 1")
+    suspend fun unexpireAllOpportunities(): Int
 
     @Query("SELECT * FROM opportunities WHERE verificationStatus = :status ORDER BY discoveredAt DESC LIMIT :limit")
     fun getOpportunitiesByVerificationStatus(status: String, limit: Int = 100): Flow<List<OpportunityEntity>>

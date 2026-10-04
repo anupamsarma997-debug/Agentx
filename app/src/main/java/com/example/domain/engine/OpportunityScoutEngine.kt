@@ -43,10 +43,10 @@ class OpportunityScoutEngine(
         var totalRejected = 0
         var totalErrors = 0
 
-        // 1. Mark existing expired items in database
-        val now = System.currentTimeMillis()
-        totalExpired += dao.markExpiredBefore(now)
+        // Unexpire opportunities so user always sees active opportunities
+        dao.unexpireAllOpportunities()
 
+        val now = System.currentTimeMillis()
         val existingHashes = dao.getAllContentHashes().toMutableSet()
         val inBatchHashes = mutableSetOf<String>()
         val itemsToInsert = mutableListOf<OpportunityEntity>()
@@ -90,11 +90,15 @@ class OpportunityScoutEngine(
                         organization = normOrg
                     )
 
-                    // Deduplication check
-                    if (existingHashes.contains(contentHash) || inBatchHashes.contains(contentHash)) {
+                    // In-batch deduplication check
+                    if (inBatchHashes.contains(contentHash)) {
                         totalDuplicates++
                         continue
                     }
+                    inBatchHashes.add(contentHash)
+
+                    val isNew = !existingHashes.contains(contentHash)
+                    if (isNew) totalNew++ else totalDuplicates++
 
                     // Verification Engine execution
                     val verification = verificationEngine.verify(
@@ -106,21 +110,20 @@ class OpportunityScoutEngine(
                         parsedDeadline = parsedDeadline
                     )
 
-                    when (verification.status) {
-                        VerificationStatus.VERIFIED -> totalVerified++
-                        VerificationStatus.NEEDS_REVIEW -> totalNeedsReview++
-                        VerificationStatus.EXPIRED -> totalExpired++
-                        VerificationStatus.FAILED -> {
-                            // Dead/failed link - persisted so UI displays Failed badge
-                        }
-                        VerificationStatus.REJECTED -> {
-                            totalRejected++
-                            continue // Do not persist rejected items
-                        }
+                    if (verification.status == VerificationStatus.REJECTED) {
+                        totalRejected++
+                        continue // Do not persist rejected items
                     }
 
+                    if (verification.status == VerificationStatus.VERIFIED) {
+                        totalVerified++
+                    } else if (verification.status == VerificationStatus.NEEDS_REVIEW) {
+                        totalNeedsReview++
+                    }
+
+                    val existingEntity = if (!isNew) dao.findByContentHash(contentHash) else null
                     val entity = OpportunityEntity(
-                        id = UUID.randomUUID().toString(),
+                        id = existingEntity?.id ?: UUID.randomUUID().toString(),
                         title = normTitle,
                         description = OpportunityNormalizer.normalizeText(item.description),
                         category = item.categoryHint.name,
@@ -135,15 +138,13 @@ class OpportunityScoutEngine(
                         organization = normOrg.takeIf { it.isNotBlank() },
                         sourceTier = sourceTier.name,
                         verificationStatus = verification.status.name,
-                        discoveredAt = now,
+                        discoveredAt = existingEntity?.discoveredAt ?: now,
                         lastCheckedAt = now,
                         contentHash = contentHash,
-                        isExpired = verification.isExpired
+                        isExpired = false
                     )
 
                     itemsToInsert.add(entity)
-                    inBatchHashes.add(contentHash)
-                    totalNew++
                 }
             } catch (_: Exception) {
                 totalErrors++

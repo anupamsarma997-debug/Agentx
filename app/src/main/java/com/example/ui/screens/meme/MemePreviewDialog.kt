@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -105,7 +106,8 @@ fun MemePreviewDialog(
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onSaveEdit: (setup: String, punchline: String, caption: String, hashtags: String) -> Unit,
-    onExportImage: ((PostImageSize) -> Unit)? = null
+    onExportImage: ((PostImageSize) -> Unit)? = null,
+    onPublishFacebook: () -> Unit = {}
 ) {
     var isEditing by remember { mutableStateOf(false) }
     var selectedMemeSize by remember { mutableStateOf(PostImageSize.SQUARE) }
@@ -387,6 +389,16 @@ fun MemePreviewDialog(
                             Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Approve")
+                        }
+
+                        Button(
+                            onClick = onPublishFacebook,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                            modifier = Modifier.weight(1.2f).testTag("publish_facebook_meme_button")
+                        ) {
+                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(15.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Post to FB", color = Color.White)
                         }
 
                         OutlinedButton(
