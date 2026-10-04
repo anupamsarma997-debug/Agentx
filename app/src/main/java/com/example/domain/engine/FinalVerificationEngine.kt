@@ -245,10 +245,9 @@ class FinalVerificationEngine(
             factsConsistent = false
         }
 
-        // 18. Platform Compatibility
-        val isInstagram = platform.equals("INSTAGRAM", ignoreCase = true)
-        if (isInstagram && fullContentText.length > 2200) {
-            issues.add("Content exceeds Instagram character limit of 2,200 chars (${fullContentText.length} chars).")
+        // 18. Platform Compatibility (Facebook Page Post)
+        if (fullContentText.length > 5000) {
+            warnings.add("Content is unusually long (${fullContentText.length} chars). Consider shortening for Facebook.")
         }
 
         // 19. Hashtag Limit

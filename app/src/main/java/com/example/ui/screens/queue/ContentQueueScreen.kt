@@ -374,8 +374,6 @@ fun ContentQueueScreen(
                         onApprove = { viewModel.approveContent(item.id, "POST") },
                         onPublish = { viewModel.publishToFacebook(item.id) },
                         onPublishFacebook = { viewModel.publishToFacebook(item.id) },
-                        onPublishInstagram = { viewModel.publishToInstagram(item.id) },
-                        onPublishBoth = { viewModel.publishToBoth(item.id) },
                         onReject = { viewModel.rejectContent(item.id, "POST", RejectionReason.USER_REJECTED) },
                         onDelete = { viewModel.deleteContentDraft(item.id) }
                     )
@@ -706,8 +704,6 @@ fun QueueItemCard(
     onApprove: () -> Unit,
     onPublish: () -> Unit = {},
     onPublishFacebook: () -> Unit = onPublish,
-    onPublishInstagram: () -> Unit = {},
-    onPublishBoth: () -> Unit = onPublish,
     onReject: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier

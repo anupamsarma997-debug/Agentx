@@ -343,16 +343,16 @@ class ContentApprovalValidator(
         }
 
         // ----------------------------------------------------
-        // Rule 8 (Warning): Instagram caption <= 2200 characters
+        // Rule 8 (Warning): Caption length <= 5000 characters
         // ----------------------------------------------------
         val caption = content.caption.trim()
-        if (caption.length > 2200) {
+        if (caption.length > 5000) {
             warnings.add(
                 RuleFailure(
                     ruleId = 8,
-                    ruleName = "Instagram Caption Too Long",
-                    reason = "Instagram caption 2200 characters se zyada hai (${caption.length} chars). Truncate ho jayega.",
-                    field = ContentField.INSTAGRAM_CAPTION,
+                    ruleName = "Caption Too Long",
+                    reason = "Caption 5000 characters se zyada hai (${caption.length} chars). Truncate ho sakta hai.",
+                    field = ContentField.FACEBOOK_BODY,
                     isBlocking = false
                 )
             )

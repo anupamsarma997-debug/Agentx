@@ -8,6 +8,7 @@ import com.example.data.model.meta.InstagramAccountType
 import com.example.data.model.meta.MetaConnectionState
 import com.example.data.model.meta.MetaConnectionStatus
 import com.example.data.remote.meta.MetaOAuthClient
+import com.example.data.remote.meta.MetaOAuthResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,8 +31,12 @@ class MetaConnectionRepository(
     )
 
     init {
-        // Automatically restore saved Facebook Page connection from persistent storage
         restoreSavedConnection()
+        if (!hasSavedConnection() && oauthClient.checkConfigurationStatus() is MetaOAuthResult.ConfigurationRequired) {
+            _connectionState.value = _connectionState.value.copy(
+                status = MetaConnectionStatus.CONFIGURATION_REQUIRED
+            )
+        }
     }
 
     fun hasSavedConnection(): Boolean {
@@ -192,22 +197,20 @@ class MetaConnectionRepository(
             tokenStore.deleteToken("meta_connected_ig_username")
         }
 
-        // Validate Instagram eligibility if present: do NOT disconnect Facebook if Instagram is personal
-        val verifiedIg = if (instagramAccount != null && instagramAccount.accountType == InstagramAccountType.PERSONAL) {
-            null
-        } else {
-            instagramAccount
-        }
+        val isPersonalIg = instagramAccount != null && instagramAccount.accountType == InstagramAccountType.PERSONAL
+        val verifiedIg = if (isPersonalIg) null else instagramAccount
+        val status = if (isPersonalIg) MetaConnectionStatus.ERROR else MetaConnectionStatus.CONNECTED
+        val errorMessage = if (isPersonalIg) {
+            "Personal account detected. Instagram publishing requires a Professional (Business or Creator) account."
+        } else null
 
         val hasToken = !effectiveToken.isNullOrBlank() || oauthClient.hasPageToken(facebookPage.pageId) || isDemoSandbox
 
         _connectionState.value = MetaConnectionState(
-            status = MetaConnectionStatus.CONNECTED,
+            status = status,
             facebookPage = facebookPage.copy(hasAccessTokenRef = hasToken),
             instagramAccount = verifiedIg,
-            errorMessage = if (instagramAccount != null && instagramAccount.accountType == InstagramAccountType.PERSONAL) {
-                "Facebook Page connected! Instagram @${instagramAccount.username} is a Personal account (switch to Professional for IG publishing)."
-            } else null,
+            errorMessage = errorMessage,
             lastConnectedTimestamp = System.currentTimeMillis(),
             isDemoSandbox = isDemoSandbox
         )
@@ -295,17 +298,15 @@ class MetaConnectionRepository(
     }
 
     fun setExpired() {
-        val hasPage = _connectionState.value.facebookPage != null || hasSavedConnection()
         _connectionState.value = _connectionState.value.copy(
-            status = if (hasPage) MetaConnectionStatus.CONNECTED else MetaConnectionStatus.EXPIRED,
+            status = MetaConnectionStatus.EXPIRED,
             errorMessage = "Meta session or token has expired. Please re-authorize the connection."
         )
     }
 
     fun setError(message: String) {
-        val hasPage = _connectionState.value.facebookPage != null || hasSavedConnection()
         _connectionState.value = _connectionState.value.copy(
-            status = if (hasPage) MetaConnectionStatus.CONNECTED else MetaConnectionStatus.ERROR,
+            status = MetaConnectionStatus.ERROR,
             errorMessage = message
         )
     }

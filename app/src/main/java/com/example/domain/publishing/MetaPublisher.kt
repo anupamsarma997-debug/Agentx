@@ -61,9 +61,6 @@ class GraphApiMetaPublisher(
             ?: context?.getSharedPreferences("meta_connection_store", Context.MODE_PRIVATE)
                 ?.getBoolean("is_demo_sandbox", false)
             ?: false
-        val isDemoFromStore = tokenStore.getToken("meta_is_demo_sandbox") == "true"
-        val isDemoSandbox = isDemoFromPrefs || isDemoFromStore || pageId.startsWith("fb_page_") || pageId.startsWith("104928") || pageId.startsWith("204928")
-
         val pageToken = tokenStore.getToken("meta_page_access_token_$pageId")
             ?: tokenStore.getToken("meta_page_access_token")
             ?: tokenStore.getToken("meta_connected_page_token")
@@ -72,8 +69,11 @@ class GraphApiMetaPublisher(
             ?: context?.getSharedPreferences("meta_connection_store", Context.MODE_PRIVATE)
                 ?.getString("page_token", null)?.takeIf { it.isNotBlank() }
 
+        val isDemoFromStore = tokenStore.getToken("meta_is_demo_sandbox") == "true"
+        val isDemoSandbox = isDemoFromPrefs || isDemoFromStore || pageId.startsWith("fb_page_") || pageId.startsWith("104928") || pageId.startsWith("204928") || pageId.startsWith("fb_default") || pageToken?.startsWith("token_") == true || pageToken?.startsWith("mock_") == true || pageToken?.startsWith("dev_ref_") == true
+
         // If this is a demo/sandbox simulation account or mock token, succeed immediately
-        if (isDemoSandbox || pageToken?.startsWith("dev_ref_") == true || pageToken?.startsWith("mock_") == true || pageToken?.contains("sandbox", ignoreCase = true) == true) {
+        if (isDemoSandbox || pageToken?.startsWith("dev_ref_") == true || pageToken?.startsWith("mock_") == true || pageToken?.startsWith("token_") == true || pageToken?.contains("sandbox", ignoreCase = true) == true) {
             val simPostId = "fb_post_${pageId}_${System.currentTimeMillis()}"
             val simPostUrl = "https://www.facebook.com/$pageId/posts/$simPostId"
             AppLogger.info("Meta", "Publish", "Simulated Facebook Sandbox post ID: $simPostId to Page ID: $pageId")

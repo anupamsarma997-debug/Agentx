@@ -29,8 +29,6 @@ import com.example.data.model.content.ContentType
 import com.example.data.model.content.GenerationStatus
 import com.example.data.model.content.PublishTargetPlatform
 import com.example.data.model.meta.FacebookPageInfo
-import com.example.data.model.meta.InstagramAccountInfo
-import com.example.data.model.meta.InstagramAccountType
 import com.example.data.model.meta.MetaConnectionState
 import com.example.data.model.meta.MetaConnectionStatus
 import com.example.data.model.opportunity.OpportunityCategory
@@ -765,76 +763,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         connectFacebookPage()
     }
 
-    fun connectInstagram() {
-        val conn = metaConnection.value
-        if (!conn.isFacebookConnected) {
-            _metaConfigDialogMessage.value = "Connect your Facebook Page first.\n\nMeta requires an eligible Instagram Professional (Business or Creator) account to be associated with an administered Facebook Page to publish content."
-            showMessage("Connect your Facebook Page first.")
-            return
-        }
-
-        val fbPage = conn.facebookPage ?: return
-        val pageToken = metaOAuthClient.getPageToken(fbPage.pageId)
-            ?: tokenStore.getToken("meta_connected_page_token")
-            ?: tokenStore.getToken("meta_page_access_token")
-
-        if (pageToken.isNullOrBlank()) {
-            if (conn.isDemoSandbox) {
-                showMessage("Demo Facebook Page active: ${fbPage.pageName}")
-                return
-            }
-            _metaConfigDialogMessage.value = "To connect Instagram, please ensure a valid Page Access Token is provided for '${fbPage.pageName}'."
-            showMessage("Page Access Token required to link Instagram.")
-            return
-        }
-
-        viewModelScope.launch {
-            metaConnectionRepository.setAuthenticating(true)
-            val igResult = metaOAuthClient.fetchInstagramForPage(fbPage.pageId, pageToken)
-            metaConnectionRepository.setAuthenticating(false)
-
-            igResult.fold(
-                onSuccess = { ig ->
-                    if (ig != null) {
-                        metaConnectionRepository.saveConnection(
-                            facebookPage = fbPage,
-                            instagramAccount = ig,
-                            pageToken = pageToken,
-                            isDemoSandbox = conn.isDemoSandbox
-                        )
-                        showMessage("Instagram Professional (@${ig.username}) connected!")
-                    } else {
-                        val notice = "Facebook Page '${fbPage.pageName}' connected hai. Linked Instagram account nahi mila."
-                        showMessage(notice)
-                        _metaConfigDialogMessage.value = "Facebook Page '${fbPage.pageName}' remains connected!\n\nNo linked Instagram Professional account was detected.\n\nTo link Instagram:\n1. Switch your Instagram account to Professional (Business or Creator) in Instagram app settings.\n2. Link the Instagram account to '${fbPage.pageName}' in Meta Business Suite."
-                    }
-                },
-                onFailure = { err ->
-                    val errTxt = err.localizedMessage ?: "Could not verify Instagram"
-                    showMessage("Facebook Page connected. Instagram check: $errTxt")
-                    _metaConfigDialogMessage.value = "Facebook Page '${fbPage.pageName}' remains connected.\n\nInstagram note: $errTxt"
-                }
-            )
-        }
-    }
-
     fun disconnectFacebook() {
         metaConnectionRepository.disconnectFacebook()
         showMessage("Facebook Page disconnected.")
     }
 
-    fun disconnectInstagram() {
-        metaConnectionRepository.disconnectInstagram()
-        showMessage("Instagram disconnected.")
-    }
-
     fun reconnectFacebook(onLaunchIntent: (android.net.Uri) -> Unit = {}) {
         // Do NOT disconnect existing connection before launching OAuth
         connectFacebookPage(onLaunchIntent)
-    }
-
-    fun reconnectInstagram() {
-        connectInstagram()
     }
 
     fun refreshMetaConnection() {
@@ -925,15 +861,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             metaConnectionRepository.setConnecting()
             val result = metaOAuthClient.connectWithPageAccessToken(cleanToken)
             result.fold(
-                onSuccess = { (fbPage, igAccount) ->
+                onSuccess = { (fbPage, _) ->
                     metaConnectionRepository.saveConnection(
                         facebookPage = fbPage,
-                        instagramAccount = igAccount,
+                        instagramAccount = null,
                         pageToken = cleanToken,
                         isDemoSandbox = false
                     )
-                    val igMsg = if (igAccount != null) " & Instagram: @${igAccount.username}" else " (No Instagram linked)"
-                    showMessage("Connected Facebook Page: ${fbPage.pageName}$igMsg")
+                    showMessage("Connected Facebook Page: ${fbPage.pageName}")
                     onComplete(true)
                 },
                 onFailure = { err ->
@@ -984,23 +919,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun setVerifiedMetaPreview(
         pageName: String,
-        pageId: String,
-        instagramUsername: String,
-        instagramType: InstagramAccountType
+        pageId: String
     ) {
         val page = FacebookPageInfo(pageId = pageId, pageName = pageName)
-        val ig = InstagramAccountInfo(
-            instagramAccountId = "ig_$pageId",
-            username = instagramUsername,
-            accountType = instagramType
-        )
         metaConnectionRepository.saveConnection(
             facebookPage = page,
-            instagramAccount = ig,
+            instagramAccount = null,
             pageToken = "dev_ref_${pageId}",
             isDemoSandbox = true
         )
-        showMessage("DEMO / SANDBOX: $pageName & @$instagramUsername")
+        showMessage("DEMO / SANDBOX: $pageName")
     }
 
     fun setFreeMode(enabled: Boolean) {
@@ -1552,20 +1480,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         publishWithTarget(contentId, PublishTargetPlatform.FACEBOOK_ONLY, onComplete)
     }
 
-    fun publishToInstagram(
-        contentId: String,
-        onComplete: (Boolean, String) -> Unit = { _, _ -> }
-    ) {
-        publishWithTarget(contentId, PublishTargetPlatform.INSTAGRAM_ONLY, onComplete)
-    }
-
-    fun publishToBoth(
-        contentId: String,
-        onComplete: (Boolean, String) -> Unit = { _, _ -> }
-    ) {
-        publishWithTarget(contentId, PublishTargetPlatform.BOTH, onComplete)
-    }
-
     fun sendTestPostToFacebookPage(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
         viewModelScope.launch {
             if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
@@ -1598,50 +1512,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 is PublishResult.Disabled -> {
                     val msg = result.message
                     AppLogger.warn("Meta", "TestPost", msg)
-                    showMessage(msg)
-                    onResult(false, msg)
-                }
-            }
-        }
-    }
-
-    fun sendTestPostToInstagram(onResult: (Boolean, String) -> Unit = { _, _ -> }) {
-        viewModelScope.launch {
-            val ig = metaConnection.value.instagramAccount
-            if (ig == null || !metaConnection.value.isInstagramConnected) {
-                val msg = "Instagram account connect nahi hai. Kripya pehle Settings me Instagram connect karein."
-                showMessage(msg)
-                AppLogger.warn("Meta", "TestPostIG", msg)
-                onResult(false, msg)
-                return@launch
-            }
-
-            val timeStr = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
-            val testCaption = "SocialAgent Instagram test post.\nTimestamp: $timeStr\n#TestPost #SocialAgent #Instagram"
-
-            AppLogger.info("Meta", "TestPostIG", "Sending test post to Instagram @${ig.username} (${ig.instagramAccountId})")
-            val result = metaPublisher.publishInstagramPhoto(
-                instagramAccountId = ig.instagramAccountId,
-                imageUrl = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
-                caption = testCaption
-            )
-
-            when (result) {
-                is PublishResult.Success -> {
-                    val successMsg = "Test Post published to Instagram successfully! ID: ${result.postId}"
-                    AppLogger.info("Meta", "TestPostIG", successMsg)
-                    showMessage(successMsg)
-                    onResult(true, successMsg)
-                }
-                is PublishResult.Failure -> {
-                    val errMsg = "Instagram Test Post Failed: ${result.error}"
-                    AppLogger.error("Meta", "TestPostIG", errMsg)
-                    showMessage(errMsg)
-                    onResult(false, errMsg)
-                }
-                is PublishResult.Disabled -> {
-                    val msg = result.message
-                    AppLogger.warn("Meta", "TestPostIG", msg)
                     showMessage(msg)
                     onResult(false, msg)
                 }

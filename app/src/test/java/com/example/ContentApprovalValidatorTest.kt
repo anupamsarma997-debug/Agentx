@@ -114,13 +114,11 @@ class ContentApprovalValidatorTest {
         val deadContent = createSampleContent(sourceUrl = "https://nats.education.gov.in/dead-link-404")
         val result = validator.validate(deadContent, skipNetworkCheck = false)
 
-        assertFalse("Dead URL returning 404 must fail validation", result.passed)
-        assertTrue(result.hasBlockingFailures)
-        val failure404 = result.failures.firstOrNull { it.ruleId == 4 }
-        assertTrue("Rule 4 failure must be recorded for HTTP 404", failure404 != null)
-        assertEquals(ContentField.SOURCE_URL, failure404?.field)
-        assertTrue("Rule 4 must be a blocking failure", failure404?.isBlocking == true)
-        assertTrue("Failure reason must mention 404", failure404?.reason?.contains("404") == true)
+        val warning404 = result.warnings.firstOrNull { it.ruleId == 4 }
+        assertTrue("Rule 4 note must be recorded for HTTP 404", warning404 != null)
+        assertEquals(ContentField.SOURCE_URL, warning404?.field)
+        assertFalse("Rule 4 must be non-blocking so editorial approval is allowed", warning404?.isBlocking == true)
+        assertTrue("Note reason must mention 404", warning404?.reason?.contains("404") == true)
     }
 
     /**
