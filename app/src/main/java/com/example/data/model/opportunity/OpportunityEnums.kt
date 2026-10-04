@@ -5,6 +5,7 @@ enum class OpportunityCategory(val displayName: String) {
     GOVERNMENT_JOB("Government Jobs"),
     INTERNSHIP("Internships"),
     SCHOLARSHIP("Scholarships"),
+    MSME("MSME Schemes"),
     FELLOWSHIP("Fellowships"),
     GRANT("Grants"),
     HACKATHON("Hackathons"),

@@ -45,6 +45,11 @@ import com.example.data.remote.scout.BharatSarkarNationalSourceProvider
 import com.example.data.remote.scout.StateGovernmentSchemeSourceProvider
 import com.example.data.remote.scout.CreatorAndYoutuberNewsSourceProvider
 import com.example.data.remote.scout.LiveGovernmentRssSourceProvider
+import com.example.data.remote.scout.MsmeComprehensiveSourceProvider
+import com.example.data.remote.scout.GovernmentJobsComprehensiveSourceProvider
+import com.example.data.remote.scout.ScholarshipsComprehensiveSourceProvider
+import com.example.data.remote.scout.InternshipsComprehensiveSourceProvider
+import com.example.data.remote.scout.OfficialPortalDirectory
 import com.example.data.repository.ContentRepository
 import com.example.data.repository.MetaConnectionRepository
 import com.example.data.repository.OpportunityRepository
@@ -112,6 +117,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val scoutEngine = OpportunityScoutEngine(
         dao = opportunityDao,
         providers = listOf(
+            MsmeComprehensiveSourceProvider(),
+            GovernmentJobsComprehensiveSourceProvider(),
+            ScholarshipsComprehensiveSourceProvider(),
+            InternshipsComprehensiveSourceProvider(),
             OfficialCuratedSourceProvider(),
             MsmeOpportunitySourceProvider(),
             BharatSarkarNationalSourceProvider(),

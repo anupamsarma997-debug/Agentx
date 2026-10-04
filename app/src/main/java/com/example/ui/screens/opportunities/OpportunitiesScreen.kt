@@ -46,6 +46,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -72,13 +75,18 @@ fun OpportunitiesScreen(
     val selectedCategory by viewModel.selectedCategoryFilter.collectAsState()
     val selectedRegion by viewModel.selectedRegionFilter.collectAsState()
     val lastScoutResult by viewModel.lastScoutResult.collectAsState()
+    var showPortalsDialog by remember { mutableStateOf(false) }
+
+    if (showPortalsDialog) {
+        OfficialPortalsDialog(onDismiss = { showPortalsDialog = false })
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // Top Header with [ SCAN NOW ] Action
+        // Top Header with [ 60+ OFFICIAL WEBSITES ] and [ SCAN NOW ] Action
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -86,7 +94,7 @@ fun OpportunitiesScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f, fill = false)) {
                 Text(
                     text = "OPPORTUNITIES",
                     style = MaterialTheme.typography.titleLarge,
@@ -94,34 +102,55 @@ fun OpportunitiesScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "${opportunities.size} active opportunities found",
+                    text = "${opportunities.size} active verified opportunities",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Button(
-                onClick = { viewModel.triggerScoutScan() },
-                enabled = !isScanning,
-                modifier = Modifier.testTag("btn_scout_scan_now"),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                if (isScanning) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Scanning...")
-                } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = { showPortalsDialog = true },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("btn_view_official_portals")
+                ) {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Default.Public,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(15.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("SCAN NOW")
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "60+ WEBSITES",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Button(
+                    onClick = { viewModel.triggerScoutScan() },
+                    enabled = !isScanning,
+                    modifier = Modifier.testTag("btn_scout_scan_now"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isScanning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Scanning...")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("SCAN NOW")
+                    }
                 }
             }
         }
@@ -219,6 +248,21 @@ fun OpportunitiesScreen(
                 },
                 label = { Text("Internships") },
                 modifier = Modifier.testTag("filter_internships")
+            )
+
+            // Category Filter: MSME Schemes
+            FilterChip(
+                selected = selectedCategory == OpportunityCategory.MSME,
+                onClick = {
+                    viewModel.setCategoryFilter(
+                        if (selectedCategory == OpportunityCategory.MSME) null else OpportunityCategory.MSME
+                    )
+                },
+                label = { Text("MSME Schemes") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFFEF3C7)
+                ),
+                modifier = Modifier.testTag("filter_msme")
             )
 
             // Category Filter: Scholarships

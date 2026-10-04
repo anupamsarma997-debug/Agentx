@@ -18,7 +18,9 @@ object OpportunityNormalizer {
         ".mil",
         ".ac.in",
         ".edu.in",
-        ".edu"
+        ".edu",
+        ".res.in",
+        ".org.in"
     )
 
     private val TIER_1_EXACT_DOMAINS = listOf(
@@ -35,6 +37,12 @@ object OpportunityNormalizer {
         "cgtmse.in",
         "mudra.org.in",
         "standupmitra.in",
+        "ibps.in",
+        "rbi.org.in",
+        "sbi.co.in",
+        "csir.res.in",
+        "nsic.co.in",
+        "icwa.in",
         "devpost.com",
         "unstop.com",
         "hackerearth.com"
