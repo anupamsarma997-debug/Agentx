@@ -20,41 +20,53 @@ object AssamAndDefenseSeedPosts {
         for (item in seedList) {
             val current = existingMap[item.id]
             if (current == null) {
-                // Generate high-resolution banner image
-                val imagePath = try {
-                    postImageGenerator.generatePostBanner(
-                        contentId = item.id,
-                        title = item.title,
-                        category = item.caption,
-                        organization = item.sourceName,
-                        deadline = "2027",
-                        sourceUrl = item.sourceUrl,
-                        region = "Assam",
-                        size = PostImageSize.SQUARE
-                    )
-                } catch (e: Exception) {
-                    null
+                // Generate all 4 sizes (Square, Portrait, Landscape, Story) for each seed post
+                var defaultImagePath: String? = null
+                for (sz in PostImageSize.entries) {
+                    val path = try {
+                        postImageGenerator.generatePostBanner(
+                            contentId = item.id,
+                            title = item.title,
+                            category = item.caption,
+                            organization = item.sourceName,
+                            deadline = "2027",
+                            sourceUrl = item.sourceUrl,
+                            region = "Assam",
+                            size = sz
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (sz == PostImageSize.SQUARE || defaultImagePath == null) {
+                        defaultImagePath = path
+                    }
                 }
 
-                val finalEntity = item.copy(imageUrl = imagePath)
+                val finalEntity = item.copy(imageUrl = defaultImagePath)
                 contentDao.insertContent(finalEntity)
             } else if (current.imageUrl.isNullOrBlank()) {
-                val imagePath = try {
-                    postImageGenerator.generatePostBanner(
-                        contentId = current.id,
-                        title = current.title,
-                        category = current.caption,
-                        organization = current.sourceName,
-                        deadline = "2027",
-                        sourceUrl = current.sourceUrl,
-                        region = "Assam",
-                        size = PostImageSize.SQUARE
-                    )
-                } catch (e: Exception) {
-                    null
+                var defaultImagePath: String? = null
+                for (sz in PostImageSize.entries) {
+                    val path = try {
+                        postImageGenerator.generatePostBanner(
+                            contentId = current.id,
+                            title = current.title,
+                            category = current.caption,
+                            organization = current.sourceName,
+                            deadline = "2027",
+                            sourceUrl = current.sourceUrl,
+                            region = "Assam",
+                            size = sz
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (sz == PostImageSize.SQUARE || defaultImagePath == null) {
+                        defaultImagePath = path
+                    }
                 }
-                if (imagePath != null) {
-                    contentDao.updateContentDraft(current.id, current.title, current.body, current.caption, current.hashtags)
+                if (defaultImagePath != null) {
+                    contentDao.updateImageUrl(current.id, defaultImagePath)
                 }
             }
         }

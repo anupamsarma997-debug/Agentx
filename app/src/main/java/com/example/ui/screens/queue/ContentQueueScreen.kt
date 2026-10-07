@@ -284,7 +284,7 @@ fun ContentQueueScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "CONTENT QUEUE",
                     style = MaterialTheme.typography.titleLarge,
@@ -296,6 +296,29 @@ fun ContentQueueScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(
+                    onClick = { viewModel.batchApproveAllPosts() },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.testTag("btn_approve_all_queue")
+                ) {
+                    Text("Approve All", style = MaterialTheme.typography.labelSmall)
+                }
+
+                Button(
+                    onClick = { viewModel.autoPublishPendingPosts() },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.testTag("btn_publish_all_fb")
+                ) {
+                    Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Publish All FB", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                }
             }
         }
 

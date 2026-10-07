@@ -83,16 +83,24 @@ class ContentRepository(
 
         if (outcome is ContentCreationOutcome.Success) {
             val contentId = UUID.randomUUID().toString()
-            val generatedImagePath = postImageGenerator?.generatePostBanner(
-                contentId = contentId,
-                title = outcome.result.title,
-                category = opportunity.category,
-                organization = opportunity.organization ?: outcome.result.sourceName,
-                deadline = opportunity.deadline,
-                sourceUrl = outcome.result.sourceUrl,
-                region = opportunity.region,
-                size = imageSize
-            )
+            
+            // Generate all 4 social media sizes (Square 1:1, Portrait 4:5, Landscape 16:9, Story 9:16)
+            var targetImagePath: String? = null
+            PostImageSize.entries.forEach { sz ->
+                val generatedPath = postImageGenerator?.generatePostBanner(
+                    contentId = contentId,
+                    title = outcome.result.title,
+                    category = opportunity.category,
+                    organization = opportunity.organization ?: outcome.result.sourceName,
+                    deadline = opportunity.deadline,
+                    sourceUrl = outcome.result.sourceUrl,
+                    region = opportunity.region,
+                    size = sz
+                )
+                if (sz == imageSize || targetImagePath == null) {
+                    targetImagePath = generatedPath
+                }
+            }
 
             val entity = ContentEntity(
                 id = contentId,
@@ -111,7 +119,7 @@ class ContentRepository(
                 verificationStatus = opportunity.verificationStatus,
                 aiModel = "gemini-2.5-flash",
                 errorMessage = null,
-                imageUrl = generatedImagePath
+                imageUrl = targetImagePath
             )
             contentDao.insertContent(entity)
         }

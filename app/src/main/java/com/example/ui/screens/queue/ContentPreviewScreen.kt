@@ -271,13 +271,23 @@ fun ContentPreviewScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            TextButton(
-                                onClick = { viewModel.regeneratePostImage(content.id, selectedImageSize) },
-                                modifier = Modifier.testTag("btn_regenerate_banner")
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Regenerate")
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                TextButton(
+                                    onClick = { viewModel.generateAllImageSizesForPost(content.id) },
+                                    modifier = Modifier.testTag("btn_generate_all_sizes")
+                                ) {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("All 4 Sizes", style = MaterialTheme.typography.labelSmall)
+                                }
+                                TextButton(
+                                    onClick = { viewModel.switchOrGeneratePostImageSize(content.id, selectedImageSize) },
+                                    modifier = Modifier.testTag("btn_regenerate_banner")
+                                ) {
+                                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Regenerate", style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
 
@@ -285,7 +295,7 @@ fun ContentPreviewScreen(
 
                         // Multi-size aspect ratio selector chips
                         Text(
-                            text = "Size / Aspect Ratio: ${selectedImageSize.displayName} (${selectedImageSize.width}x${selectedImageSize.height})",
+                            text = "Active Size: ${selectedImageSize.displayName} (${selectedImageSize.width}x${selectedImageSize.height})",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -300,7 +310,7 @@ fun ContentPreviewScreen(
                                     selected = selectedImageSize == size,
                                     onClick = {
                                         selectedImageSize = size
-                                        viewModel.regeneratePostImage(content.id, size)
+                                        viewModel.switchOrGeneratePostImageSize(content.id, size)
                                     },
                                     label = { Text(size.aspectRatioLabel) },
                                     modifier = Modifier.testTag("preview_size_chip_${size.id}")

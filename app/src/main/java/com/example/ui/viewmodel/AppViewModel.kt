@@ -224,6 +224,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = 0)
 
     val isGeneratingContent = MutableStateFlow(false)
+    val isBatchGenerating = MutableStateFlow(false)
+    val batchProgressText = MutableStateFlow<String?>(null)
+    val batchProgressRatio = MutableStateFlow(0f)
 
     // Meme Engine State Flows (Phase 6)
     val allMemes: StateFlow<List<com.example.data.local.entity.MemeDraftEntity>> = memeRepository.observeAllMemes()
@@ -468,6 +471,206 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 isGeneratingContent.value = false
             }
+        }
+    }
+
+    /**
+     * Batch generates complete post drafts with all 4 banner sizes (Square 1:1, Portrait 4:5, Landscape 16:9, Story 9:16).
+     * Automatically covers all Assam schemes, Police, Army, Navy & Merchant Navy opportunities.
+     */
+    fun batchGenerateAllOpportunities(
+        categoryFilter: String? = null,
+        language: String = "ASSAMESE",
+        onComplete: ((Int) -> Unit)? = null
+    ) {
+        if (isBatchGenerating.value) return
+        viewModelScope.launch {
+            isBatchGenerating.value = true
+            batchProgressRatio.value = 0.05f
+            batchProgressText.value = "প্ৰস্তুতি চলি আছে... (Preparing opportunities...)"
+
+            try {
+                var list: List<OpportunityEntity> = allOpportunities.value
+                if (list.isEmpty()) {
+                    list = opportunityDao.getOpportunitiesByVerificationStatusSync(VerificationStatus.VERIFIED.name, 100)
+                }
+                if (list.isEmpty()) {
+                    val s = settings.value
+                    try {
+                        opportunityRepository.runScoutScan(
+                            assamEnabled = true,
+                            northeastEnabled = true,
+                            indiaEnabled = true,
+                            internationalEnabled = true,
+                            newsEnabled = true
+                        )
+                        list = allOpportunities.value.ifEmpty {
+                            opportunityDao.getOpportunitiesByVerificationStatusSync(VerificationStatus.VERIFIED.name, 100)
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                val targetList: List<OpportunityEntity> = when (categoryFilter) {
+                    "ASSAM_SCHEMES" -> list.filter { item ->
+                        item.title.contains("Orunodoi", ignoreCase = true) ||
+                        item.title.contains("অৰুণোদয়") ||
+                        item.title.contains("Nijut", ignoreCase = true) ||
+                        item.title.contains("মইনা") ||
+                        item.title.contains("CMAAA", ignoreCase = true) ||
+                        item.title.contains("আত্মনিৰ্ভৰ") ||
+                        item.title.contains("Scooty", ignoreCase = true) ||
+                        item.title.contains("স্কুটাৰ") ||
+                        item.title.contains("Swanirbhar", ignoreCase = true) ||
+                        item.title.contains("স্বনিৰ্ভৰ") ||
+                        item.title.contains("Arundhati", ignoreCase = true) ||
+                        item.title.contains("অৰুন্ধতী") ||
+                        item.region.contains("Assam", ignoreCase = true)
+                    }
+                    "DEFENSE_POLICE" -> list.filter { item ->
+                        item.title.contains("Police", ignoreCase = true) ||
+                        item.title.contains("আৰক্ষী") ||
+                        item.title.contains("Army", ignoreCase = true) ||
+                        item.title.contains("সেনা") ||
+                        item.title.contains("Navy", ignoreCase = true) ||
+                        item.title.contains("নৌসেনা") ||
+                        item.title.contains("Merchant", ignoreCase = true) ||
+                        item.title.contains("SLPRB", ignoreCase = true) ||
+                        item.title.contains("Agniveer", ignoreCase = true) ||
+                        item.category.contains("Recruitment", ignoreCase = true) ||
+                        item.category.contains("Job", ignoreCase = true)
+                    }
+                    "SCHOLARSHIPS" -> list.filter { item ->
+                        item.category.contains("Scholarship", ignoreCase = true) ||
+                        item.title.contains("Scholarship", ignoreCase = true) ||
+                        item.title.contains("Pragati", ignoreCase = true) ||
+                        item.title.contains("বৃত্তি")
+                    }
+                    else -> list
+                }.ifEmpty { list }
+
+                val s = settings.value
+                settingsRepository.setDailyTargets(
+                    maxOf(s.dailyPostTarget + targetList.size + 10, s.todayPostCount + targetList.size + 10),
+                    s.dailyReelTarget
+                )
+
+                var successCount = 0
+                val total = targetList.size
+
+                for ((index, opp) in targetList.withIndex()) {
+                    batchProgressRatio.value = ((index + 1).toFloat() / total.toFloat()).coerceIn(0.05f, 0.98f)
+                    batchProgressText.value = "প্ৰস্তুত হৈ আছে (${index + 1}/$total): ${opp.title}"
+
+                    val contentType = when {
+                        opp.title.contains("Police", ignoreCase = true) ||
+                        opp.title.contains("Army", ignoreCase = true) ||
+                        opp.title.contains("Navy", ignoreCase = true) ||
+                        opp.title.contains("Merchant", ignoreCase = true) ||
+                        opp.title.contains("আৰক্ষী") ||
+                        opp.title.contains("সেনা") ||
+                        opp.category.contains("Recruitment", ignoreCase = true) ||
+                        opp.category.contains("Job", ignoreCase = true) -> ContentType.JOB_ALERT
+
+                        opp.category.contains("Scholarship", ignoreCase = true) ||
+                        opp.title.contains("Scholarship", ignoreCase = true) -> ContentType.SCHOLARSHIP_ALERT
+
+                        opp.category.contains("Hackathon", ignoreCase = true) -> ContentType.HACKATHON_ALERT
+                        opp.category.contains("Startup", ignoreCase = true) -> ContentType.STARTUP_ALERT
+                        else -> ContentType.OPPORTUNITY_POST
+                    }
+
+                    try {
+                        val outcome = contentRepository.generateContent(
+                            opportunity = opp,
+                            contentType = contentType,
+                            platform = ContentPlatform.BOTH,
+                            length = ContentLength.MEDIUM,
+                            imageSize = PostImageSize.SQUARE,
+                            language = language
+                        )
+                        if (outcome is ContentCreationOutcome.Success) {
+                            settingsRepository.incrementTodayPostCount()
+                            successCount++
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.warn("BatchGen", "ItemFail", "Failed to generate for ${opp.title}: ${e.message}")
+                    }
+                }
+
+                batchProgressRatio.value = 1.0f
+                batchProgressText.value = "সকলো প্ৰস্তুত হ'ল! ($successCount/$total)"
+                showMessage("সফলভাৱে সকলো $successCount টা পোষ্ট আৰু ৪টা আকাৰৰ বেনাৰ প্ৰস্তুত কৰা হ'ল!")
+                onComplete?.invoke(successCount)
+            } catch (e: Exception) {
+                showMessage("Batch generation error: ${e.localizedMessage ?: "Unknown"}")
+                onComplete?.invoke(0)
+            } finally {
+                isBatchGenerating.value = false
+                batchProgressText.value = null
+            }
+        }
+    }
+
+    fun switchOrGeneratePostImageSize(contentId: String, size: PostImageSize) {
+        viewModelScope.launch {
+            val item = contentDao.getContentByIdSync(contentId) ?: return@launch
+            val appCtx = getApplication<android.app.Application>().applicationContext
+            val imagesDir = java.io.File(appCtx.filesDir, "post_images")
+            val sizeFile = java.io.File(imagesDir, "post_${item.id}_${size.id}.jpg")
+            val targetPath = if (sizeFile.exists()) {
+                sizeFile.absolutePath
+            } else {
+                postImageGenerator.generatePostBanner(
+                    contentId = item.id,
+                    title = item.title,
+                    category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                    organization = item.sourceName,
+                    deadline = null,
+                    sourceUrl = item.sourceUrl,
+                    region = null,
+                    size = size
+                )
+            }
+            if (targetPath != null) {
+                contentDao.updateImageUrl(item.id, targetPath)
+                showMessage("বেনাৰৰ আকাৰ নিৰ্বাচন কৰা হ'ল: ${size.displayName}")
+            }
+        }
+    }
+
+    fun generateAllImageSizesForPost(contentId: String) {
+        viewModelScope.launch {
+            val item = contentDao.getContentByIdSync(contentId) ?: return@launch
+            var defaultPath: String? = null
+            PostImageSize.entries.forEach { sz ->
+                val path = postImageGenerator.generatePostBanner(
+                    contentId = item.id,
+                    title = item.title,
+                    category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                    organization = item.sourceName,
+                    deadline = null,
+                    sourceUrl = item.sourceUrl,
+                    region = null,
+                    size = sz
+                )
+                if (sz == PostImageSize.SQUARE || defaultPath == null) {
+                    defaultPath = path
+                }
+            }
+            if (defaultPath != null) {
+                contentDao.updateImageUrl(item.id, defaultPath)
+                showMessage("সকলো ৪টা আকাৰৰ বেনাৰ (Square, Portrait, Landscape, Story) প্ৰস্তুত হ'ল!")
+            }
+        }
+    }
+
+    fun batchApproveAllPosts() {
+        viewModelScope.launch {
+            val pending = contentDao.getAllContentSync().filter { it.generationStatus != GenerationStatus.APPROVED.name && it.generationStatus != GenerationStatus.PUBLISHED.name }
+            for (p in pending) {
+                contentDao.updateStatus(p.id, GenerationStatus.APPROVED.name)
+            }
+            showMessage("সকলো ${pending.size} টা পোষ্ট অনুমোদন কৰা হ'ল (Approved ${pending.size} posts)!")
         }
     }
 

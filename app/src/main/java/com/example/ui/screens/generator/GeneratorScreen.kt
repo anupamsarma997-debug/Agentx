@@ -30,6 +30,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -72,6 +73,9 @@ fun GeneratorScreen(
     val scrollState = rememberScrollState()
     val opportunities by viewModel.allOpportunities.collectAsState()
     val isGenerating by viewModel.isGeneratingContent.collectAsState()
+    val isBatchGenerating by viewModel.isBatchGenerating.collectAsState()
+    val batchProgressText by viewModel.batchProgressText.collectAsState()
+    val batchProgressRatio by viewModel.batchProgressRatio.collectAsState()
     val settings by viewModel.settings.collectAsState()
 
     var selectedOpportunity by remember { mutableStateOf<OpportunityEntity?>(null) }
@@ -150,6 +154,141 @@ fun GeneratorScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                }
+            }
+        }
+
+        // ⚡ BATCH GENERATOR (GENERATE EVERYTHING) Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("batch_generator_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "⚡ এক-ক্লিকত সকলোবোৰ প্ৰস্তুত কৰক",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = "BATCH GENERATE ALL: সকলো আঁচনি, আৰক্ষী, সেনা আৰু নৌসেনাৰ ফটো আৰু পোষ্ট একেলগে বনাওক (Square, Portrait, Landscape, Story)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f)
+                )
+
+                if (isBatchGenerating) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = batchProgressText ?: "প্ৰস্তুত হৈ আছে...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { batchProgressRatio },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            val langParam = when {
+                                selectedLanguage.startsWith("অসমীয়া") -> "ASSAMESE"
+                                selectedLanguage.startsWith("বাংলা") -> "BENGALI"
+                                selectedLanguage.startsWith("Hindi") -> "HINDI"
+                                else -> "ENGLISH"
+                            }
+                            viewModel.batchGenerateAllOpportunities("ALL", langParam) {
+                                onNavigateToQueue()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("btn_batch_generate_all")
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🚀 GENERATE ALL (ALL 10+ POSTS & ALL 4 SIZES)",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val langParam = when {
+                            selectedLanguage.startsWith("অসমীয়া") -> "ASSAMESE"
+                            selectedLanguage.startsWith("বাংলা") -> "BENGALI"
+                            selectedLanguage.startsWith("Hindi") -> "HINDI"
+                            else -> "ENGLISH"
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.batchGenerateAllOpportunities("ASSAM_SCHEMES", langParam) {
+                                    onNavigateToQueue()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_batch_assam_schemes")
+                        ) {
+                            Text("🏛️ All Assam Schemes (${opportunities.count { it.region.contains("Assam", ignoreCase = true) }})", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.batchGenerateAllOpportunities("DEFENSE_POLICE", langParam) {
+                                    onNavigateToQueue()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_batch_defense")
+                        ) {
+                            Text("🛡️ Police & Defense (আৰক্ষী আৰু সেনা)", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.batchGenerateAllOpportunities("SCHOLARSHIPS", langParam) {
+                                    onNavigateToQueue()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_batch_scholarships")
+                        ) {
+                            Text("🎓 All Scholarships", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                 }
             }
         }
@@ -450,9 +589,10 @@ fun GeneratorScreen(
                     }
                 }
                 Text(
-                    text = selectedImageSize.description,
+                    text = "${selectedImageSize.description} • ✨ All 4 sizes (1:1, 4:5, 16:9, 9:16) are generated automatically!",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
                 )
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -498,8 +638,33 @@ fun GeneratorScreen(
                     } else {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("GENERATE IMAGE + TEXT POST ($selectedLanguage)")
+                        Text("GENERATE THIS POST ($selectedLanguage)")
                     }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        val langParam = when {
+                            selectedLanguage.startsWith("অসমীয়া") -> "ASSAMESE"
+                            selectedLanguage.startsWith("বাংলা") -> "BENGALI"
+                            selectedLanguage.startsWith("Hindi") -> "HINDI"
+                            else -> "ENGLISH"
+                        }
+                        viewModel.batchGenerateAllOpportunities("ALL", langParam) {
+                            onNavigateToQueue()
+                        }
+                    },
+                    enabled = !isBatchGenerating && !isGenerating,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("btn_batch_generate_all_secondary")
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("⚡ GENERATE ALL OPPORTUNITIES ($selectedLanguage)", style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
