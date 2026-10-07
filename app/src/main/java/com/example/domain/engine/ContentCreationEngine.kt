@@ -60,7 +60,28 @@ class ContentCreationEngine(
     /**
      * Constructs strict system instructions enforcing zero fabrication, neutral tone, and JSON schema.
      */
-    fun buildSystemPrompt(contentType: ContentType, platform: ContentPlatform, length: ContentLength): String {
+    fun buildSystemPrompt(
+        contentType: ContentType,
+        platform: ContentPlatform,
+        length: ContentLength,
+        language: String = "ASSAMESE"
+    ): String {
+        val languageInstruction = if (language.equals("ASSAMESE", ignoreCase = true)) {
+            """
+            ASSAMESE SCRIPT MANDATE (অসমীয়া আখৰ):
+            - Write the post title, Facebook post body, and Instagram caption in clear, authentic Assamese script (অসমীয়া আখৰ).
+            - Use these clear Assamese section headers:
+              • 📢 জাননী (Headline / Announcement)
+              • 📌 পদ / আঁচনিৰ সবিশেষ (Details)
+              • 🎯 কি কি যোগ্যতা লাগিব (Requirements / Eligibility: Age limit, Education, Physical tests)
+              • 📄 প্ৰয়োজনীয় নথিপত্ৰ (Required Documents)
+              • 🔗 ক'ত আবেদন কৰিব (Where to Apply official link)
+              • ⏰ অন্তিম তাৰিখ (Deadline)
+            """.trimIndent()
+        } else {
+            "- Tone: clear, concise, informative, mobile-friendly Indian English or Hinglish."
+        }
+
         return """
             You are a factual social media copy assistant for an Indian opportunity and news portal.
             
@@ -69,17 +90,17 @@ class ContentCreationEngine(
             - Never invent facts, statistics, organizations, URLs, or deadlines.
             - If any information is missing or not provided, explicitly write "Details official site par dekhein".
             - Do NOT truncate any field with "..." or leave sentences incomplete. Complete every sentence cleanly.
-            - Tone: clear, concise, informative, mobile-friendly Indian English. No clickbait or sensationalism.
+            $languageInstruction
             - Length Target: ${length.displayName} (${length.wordCountGuide}, target ~${length.targetWords} words).
             - Platform Target: ${platform.displayName}.
             - Content Type: ${contentType.displayName}.
-            - Hashtags: Maximum 8 highly relevant hashtags.
-            - Call to Action: Factual only (e.g. "Apply or check eligibility on the official portal.").
+            - Hashtags: Maximum 8 highly relevant hashtags (include relevant Assamese/India hashtags).
+            - Call to Action: Factual only (e.g. "পোনে পোনে অফিচিয়েল প'ৰ্টেলত আবেদন কৰক / Apply on official portal.").
             
             REGIONAL HEADERS:
-            - If the opportunity region is Assam: start with "📢 Assam Opportunity Alert"
-            - If Northeast India: start with "📢 Northeast Opportunity Alert"
-            - If India: start with "🇮🇳 India Opportunity Alert"
+            - If the opportunity region is Assam: start with "📢 অসম চৰকাৰৰ আঁচনি / নিযুক্তি জাননী (Assam Alert)"
+            - If Northeast India: start with "📢 উত্তৰ-পূব জাননী (Northeast Alert)"
+            - If India: start with "🇮🇳 ভাৰতীয় জাননী (India Alert)"
             - If International: start with "🌍 International Opportunity Alert"
             
             POLITICAL & NEWS NEUTRALITY:
@@ -89,8 +110,8 @@ class ContentCreationEngine(
             OUTPUT REQUIREMENT:
             Return ONLY a valid JSON object matching this exact schema:
             {
-              "title": "Concise headline (min 5 characters, no ellipsis)",
-              "facebookBody": "Full Facebook post body (min 100 characters with complete sentences, details, and call to action)",
+              "title": "Concise headline in Assamese/English (min 5 characters, no ellipsis)",
+              "facebookBody": "Full Facebook post body with complete sentences, requirements, eligibility, where to apply, and deadline",
               "instagramCaption": "Short caption for Instagram feed with key bullet points",
               "hashtags": ["tag1", "tag2"],
               "sourceUrl": "The exact source URL provided in the prompt",
@@ -143,7 +164,8 @@ class ContentCreationEngine(
         fact: SourceFact,
         contentType: ContentType = ContentType.OPPORTUNITY_POST,
         platform: ContentPlatform = ContentPlatform.BOTH,
-        length: ContentLength = ContentLength.SHORT
+        length: ContentLength = ContentLength.SHORT,
+        language: String = "ASSAMESE"
     ): ContentCreationOutcome {
         val verificationStatus = VerificationStatus.fromString(fact.verificationStatus)
         val gate = checkGenerationGate(verificationStatus)
@@ -154,7 +176,7 @@ class ContentCreationEngine(
         // Fetch live source page text via HTTP GET with 8s timeout to ensure factual grounded generation
         val liveSourceText = geminiClient.fetchLiveSourcePageText(fact.sourceUrl)
 
-        val systemPrompt = buildSystemPrompt(contentType, platform, length, fact)
+        val systemPrompt = buildSystemPrompt(contentType, platform, length, language)
         val userPrompt = buildUserPrompt(fact, liveSourceText)
 
         // Attempt 1: Standard generation
@@ -177,32 +199,64 @@ class ContentCreationEngine(
             }
 
             // If truncated or malformed, attempt one automatic retry with strict anti-truncation prompt
-            val retryUserPrompt = "$userPrompt\n\nATTENTION: Your previous output was rejected because a field was empty, truncated with '...', or incomplete. Provide complete non-truncated JSON."
+            val retryUserPrompt = "$userPrompt\n\nATTENTION: Your previous output was rejected because a field was empty, truncated with '...', or incomplete. Provide complete non-truncated JSON in Assamese script."
             aiResult = geminiClient.generateContent(systemPrompt, retryUserPrompt)
         }
 
+        val isAssameseMode = language.equals("ASSAMESE", ignoreCase = true) ||
+            fact.region.contains("Assam", ignoreCase = true) ||
+            fact.title.any { it in '\u0980'..'\u09FF' }
+
         return when (aiResult) {
             is AIResult.ConfigurationRequired, is AIResult.Error -> {
-                val fallbackResult = GeneratedContentResult(
-                    title = fact.title,
-                    body = buildString {
-                        append(fact.title)
-                        append("\n\n")
-                        append(fact.description)
+                val fallbackBody = if (isAssameseMode) {
+                    buildString {
+                        append("📢 ").append(fact.title).append("\n\n")
+                        append("📌 পদ / আঁচনিৰ সবিশেষ (Details):\n").append(fact.description).append("\n\n")
                         if (!fact.eligibility.isNullOrBlank()) {
-                            append("\n\n🎯 Eligibility: ${fact.eligibility}")
+                            append("🎯 কি কি যোগ্যতা লাগিব (Requirements / Eligibility):\n• ").append(fact.eligibility).append("\n\n")
                         }
                         if (!fact.deadline.isNullOrBlank()) {
-                            append("\n⏰ Deadline: ${fact.deadline}")
+                            append("⏰ আবেদনৰ অন্তিম তাৰিখ (Deadline): ").append(fact.deadline).append("\n\n")
                         }
                         if (!fact.organization.isNullOrBlank()) {
-                            append("\n🏛️ Organization: ${fact.organization}")
+                            append("🏛️ সংগঠন / বিভাগ: ").append(fact.organization).append("\n\n")
                         }
-                        append("\n\n🔗 Official Portal: ${fact.sourceUrl}")
-                        append("\n\n📌 Apply or check detailed guidelines on the official portal.")
-                    },
-                    caption = "📢 ${fact.title}\n\n${fact.description.take(160)}...\n\n⏰ Deadline: ${fact.deadline ?: "Details official site par dekhein"}\n🔗 Portal: ${fact.sourceUrl}",
-                    hashtags = listOf("#Opportunity", "#Career", "#MSME", "#BharatSarkar", "#JobAlert", "#Alert"),
+                        append("🔗 ক'ত আবেদন কৰিব (Where to Apply / Official Portal):\n")
+                        append("পোনে পোনে অফিচিয়েল ৱেবচাইটত আবেদন কৰক:\n👉 ").append(fact.sourceUrl).append("\n\n")
+                        append("⚠️ অনলাইন আবেদনৰ পূৰ্বে অফিচিয়েল জাননীখন ভালদৰে পঢ়ি লওক।")
+                    }
+                } else {
+                    buildString {
+                        append(fact.title).append("\n\n")
+                        append(fact.description).append("\n\n")
+                        if (!fact.eligibility.isNullOrBlank()) {
+                            append("🎯 Eligibility & Requirements: ").append(fact.eligibility).append("\n\n")
+                        }
+                        if (!fact.deadline.isNullOrBlank()) {
+                            append("⏰ Deadline: ").append(fact.deadline).append("\n\n")
+                        }
+                        append("🔗 Where to Apply: ").append(fact.sourceUrl)
+                    }
+                }
+
+                val fallbackCaption = if (isAssameseMode) {
+                    "${fact.title}\n\nকি কি যোগ্যতা লাগিব আৰু ক'ত আবেদন কৰিব চাওক।\n🔗 পৰ্টেল: ${fact.sourceUrl}"
+                } else {
+                    "📢 ${fact.title}\n\n${fact.description.take(160)}...\n\n⏰ Deadline: ${fact.deadline ?: "Official site par dekhein"}\n🔗 Portal: ${fact.sourceUrl}"
+                }
+
+                val fallbackHashtags = if (isAssameseMode) {
+                    listOf("#AssamGovt", "#অসম", "#AssamSchemes", "#AssamJobs", "#JobAlertAssam", "#SLPRB", "#Agniveer")
+                } else {
+                    listOf("#Opportunity", "#Career", "#MSME", "#BharatSarkar", "#JobAlert", "#Alert")
+                }
+
+                val fallbackResult = GeneratedContentResult(
+                    title = fact.title,
+                    body = fallbackBody,
+                    caption = fallbackCaption,
+                    hashtags = fallbackHashtags,
                     sourceUrl = fact.sourceUrl,
                     sourceName = fact.sourceName,
                     contentType = contentType,
@@ -229,12 +283,15 @@ class ContentCreationEngine(
                     val initialStatus = resolveInitialStatus(verificationStatus)
                     ContentCreationOutcome.Success(validation.getOrThrow(), initialStatus)
                 } else {
-                    // Fallback to Needs Review with factual baseline so user never loses work
                     val fallbackResult = GeneratedContentResult(
                         title = fact.title,
-                        body = "${fact.title}\n\n${fact.description}\n\nEligibility: ${fact.eligibility ?: "Details official site par dekhein"}\nDeadline: ${fact.deadline ?: "Details official site par dekhein"}\nOfficial Portal: ${fact.sourceUrl}",
+                        body = if (isAssameseMode) {
+                            "📢 ${fact.title}\n\n${fact.description}\n\n🎯 কি কি যোগ্যতা লাগিব: ${fact.eligibility ?: "অফিচিয়েল ৱেবচাইটত চাওক"}\n⏰ অন্তিম তাৰিখ: ${fact.deadline ?: "অফিচিয়েল ৱেবচাইটত চাওক"}\n🔗 ক'ত আবেদন কৰিব: ${fact.sourceUrl}"
+                        } else {
+                            "${fact.title}\n\n${fact.description}\n\nEligibility: ${fact.eligibility ?: "Details official site par dekhein"}\nDeadline: ${fact.deadline ?: "Details official site par dekhein"}\nOfficial Portal: ${fact.sourceUrl}"
+                        },
                         caption = "${fact.title} - Apply at ${fact.sourceUrl}",
-                        hashtags = listOf("#Opportunity", "#Career", "#Alert"),
+                        hashtags = if (isAssameseMode) listOf("#AssamGovt", "#অসম", "#AssamCareer") else listOf("#Opportunity", "#Career", "#Alert"),
                         sourceUrl = fact.sourceUrl,
                         sourceName = fact.sourceName,
                         contentType = contentType,

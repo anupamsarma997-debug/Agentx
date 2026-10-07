@@ -25,9 +25,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import com.example.util.SocialShareHelper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -434,6 +437,7 @@ fun MemeQueueItemCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -644,6 +648,27 @@ fun MemeQueueItemCard(
                         Spacer(modifier = Modifier.width(2.dp))
                         Text("FB POST", style = MaterialTheme.typography.labelSmall, color = Color.White)
                     }
+
+                    Button(
+                        onClick = {
+                            val f = java.io.File(context.filesDir, "post_images/post_meme_${meme.id}_square.jpg")
+                            SocialShareHelper.shareToFacebook(
+                                context = context,
+                                title = meme.setupText,
+                                body = "${meme.setupText}\n\n👉 ${meme.punchlineText}\n\n${meme.caption}",
+                                imagePath = if (f.exists()) f.absolutePath else null,
+                                sourceUrl = meme.sourceUrl
+                            )
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_share_fb_app_meme_${meme.id}")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("FB APP SHARE", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 OutlinedButton(
@@ -755,6 +780,7 @@ fun QueueItemCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -992,6 +1018,26 @@ fun QueueItemCard(
                         Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
                         Spacer(modifier = Modifier.width(3.dp))
                         Text("POST FB", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            SocialShareHelper.shareToFacebook(
+                                context = context,
+                                title = item.title,
+                                body = item.body,
+                                imagePath = item.imageUrl,
+                                sourceUrl = item.sourceUrl
+                            )
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("btn_share_fb_app_${item.id}")
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("FB APP SHARE", style = MaterialTheme.typography.labelSmall, color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(

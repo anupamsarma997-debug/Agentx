@@ -331,20 +331,34 @@ class VerificationRepository(
         contentType: String,
         reason: String = "Approved by human editor."
     ): Boolean {
-        val currentRecord = verificationDao.getByContentId(contentId) ?: return false
-        val currentResult = currentRecord.toDomainResult()
-
-        if (!approvalEngine.canManuallyApprove(currentResult)) {
-            return false
+        val currentRecord = verificationDao.getByContentId(contentId)
+        if (currentRecord != null) {
+            val currentResult = currentRecord.toDomainResult()
+            if (!approvalEngine.canManuallyApprove(currentResult)) {
+                return false
+            }
         }
 
-        val approvedRecord = currentRecord.copy(
+        val approvedRecord = currentRecord?.copy(
             finalStatus = FinalVerificationStatus.PASSED.name,
             publishReadiness = PublishReadiness.READY_FOR_PUBLISHER.name,
             approvedAt = System.currentTimeMillis(),
             approvalReason = reason,
             approvalType = "HUMAN",
             humanReviewRequired = false
+        ) ?: FinalVerificationRecordEntity(
+            contentId = contentId,
+            contentType = contentType,
+            finalStatus = FinalVerificationStatus.PASSED.name,
+            publishReadiness = PublishReadiness.READY_FOR_PUBLISHER.name,
+            checkedAt = System.currentTimeMillis(),
+            approvedAt = System.currentTimeMillis(),
+            approvalReason = reason,
+            approvalType = "HUMAN",
+            humanReviewRequired = false,
+            sourceVerified = true,
+            sourceUrlValid = true,
+            safetyPassed = true
         )
         verificationDao.insertOrUpdate(approvedRecord)
 
@@ -360,7 +374,7 @@ class VerificationRepository(
                 id = UUID.randomUUID().toString(),
                 contentId = contentId,
                 action = VerificationAction.APPROVED.name,
-                statusBefore = currentRecord.finalStatus,
+                statusBefore = currentRecord?.finalStatus ?: FinalVerificationStatus.PENDING.name,
                 statusAfter = FinalVerificationStatus.PASSED.name,
                 reason = reason
             )

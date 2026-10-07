@@ -79,6 +79,7 @@ fun GeneratorScreen(
     var selectedPlatform by remember { mutableStateOf(ContentPlatform.BOTH) }
     var selectedLength by remember { mutableStateOf(ContentLength.SHORT) }
     var selectedImageSize by remember { mutableStateOf(PostImageSize.SQUARE) }
+    var selectedLanguage by remember { mutableStateOf("অসমীয়া (Assamese)") }
     var showSourceSelectorDialog by remember { mutableStateOf(false) }
 
     // Auto-select first verified opportunity if none selected
@@ -176,6 +177,114 @@ fun GeneratorScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // 1-Tap Quick Presets for Assam Schemes & Defense
+                Text(
+                    text = "🌟 ১-টেপ বাছনি: অসম চৰকাৰৰ আঁচনি আৰু সুৰক্ষা নিযুক্তি",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "তলৰ যিকোনো এটা ক্লিক কৰক - স্বয়ংক্ৰিয়ভাৱে ছবি আৰু তথ্য লোড হ'ব:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Assam Schemes Chips
+                Text(
+                    text = "অসমৰ মুখ্য আঁচনিসমূহ (Assam Flagship Asoni):",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val assamPresets = listOf(
+                        "অৰুণোদয় ৩.০" to "Orunodoi",
+                        "নিজুত মইনা" to "Nijut Moina",
+                        "আত্মনিৰ্ভৰ অসম" to "CMAAA",
+                        "স্কুটাৰ আঁচনি" to "Scooty",
+                        "স্বনিৰ্ভৰ নাৰী" to "Swanirbhar",
+                        "অৰুন্ধতী সোণ" to "Arundhati"
+                    )
+                    assamPresets.forEach { (label, keyword) ->
+                        FilterChip(
+                            selected = selectedOpportunity?.title?.contains(keyword, ignoreCase = true) == true ||
+                                       selectedOpportunity?.title?.contains(label) == true,
+                            onClick = {
+                                val match = opportunities.firstOrNull {
+                                    it.title.contains(keyword, ignoreCase = true) || it.title.contains(label)
+                                }
+                                if (match != null) {
+                                    selectedOpportunity = match
+                                }
+                                selectedLanguage = "অসমীয়া (Assamese)"
+                                selectedContentType = ContentType.OPPORTUNITY_POST
+                            },
+                            label = { Text("🏛️ $label") }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Defense & Police Chips
+                Text(
+                    text = "আৰক্ষী আৰু প্ৰতিৰক্ষা বাহিনী (Police, Army, Navy & Merchant Navy):",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val defensePresets = listOf(
+                        "অসম আৰক্ষী নিযুক্তি (Police)" to "Police",
+                        "ভাৰতীয় সেনা (Army Rally)" to "Army",
+                        "ভাৰতীয় নৌসেনা (Navy SSR/MR)" to "Navy",
+                        "মাৰ্চেন্ট নেভী (Merchant Navy)" to "Merchant"
+                    )
+                    defensePresets.forEach { (label, keyword) ->
+                        FilterChip(
+                            selected = selectedOpportunity?.title?.contains(keyword, ignoreCase = true) == true,
+                            onClick = {
+                                val match = opportunities.firstOrNull {
+                                    it.title.contains(keyword, ignoreCase = true)
+                                }
+                                if (match != null) {
+                                    selectedOpportunity = match
+                                }
+                                selectedLanguage = "অসমীয়া (Assamese)"
+                                selectedContentType = ContentType.JOB_ALERT
+                            },
+                            label = { Text("🛡️ $label") }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Post Language Selector
+                Text(
+                    text = "পোষ্টৰ ভাষা (Post Language Script)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("অসমীয়া (Assamese)", "English / Hinglish", "বাংলা (Bengali)", "Hindi").forEach { lang ->
+                        FilterChip(
+                            selected = selectedLanguage == lang,
+                            onClick = { selectedLanguage = lang },
+                            label = { Text(lang) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // Source Selector
                 Text(
                     text = "Source Opportunity",
@@ -193,28 +302,48 @@ fun GeneratorScreen(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
                                     text = opp.title,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(Icons.Default.ChevronRight, contentDescription = "Change")
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${opp.sourceName} | ${opp.regionEnum.displayName}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (!opp.eligibility.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "🎯 কি কি যোগ্যতা লাগিব: ${opp.eligibility}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            if (opp.sourceUrl.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "🔗 ক'ত আবেদন কৰিব: ${opp.sourceUrl}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.secondary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = "${opp.sourceName} | ${opp.regionEnum.displayName}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = "Change")
                         }
                     }
                 } ?: run {
@@ -332,12 +461,19 @@ fun GeneratorScreen(
                 Button(
                     onClick = {
                         selectedOpportunity?.let { opp ->
+                            val langParam = when {
+                                selectedLanguage.startsWith("অসমীয়া") -> "ASSAMESE"
+                                selectedLanguage.startsWith("বাংলা") -> "BENGALI"
+                                selectedLanguage.startsWith("Hindi") -> "HINDI"
+                                else -> "ENGLISH"
+                            }
                             viewModel.generateContentForOpportunity(
                                 opportunity = opp,
                                 contentType = selectedContentType,
                                 platform = selectedPlatform,
                                 length = selectedLength,
-                                imageSize = selectedImageSize
+                                imageSize = selectedImageSize,
+                                language = langParam
                             ) { success ->
                                 if (success) {
                                     onNavigateToQueue()
@@ -358,11 +494,11 @@ fun GeneratorScreen(
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Generating Factual Draft...")
+                        Text("পোষ্ট আৰু ফটো প্ৰস্তুত হৈ আছে...")
                     } else {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("GENERATE DRAFT")
+                        Text("GENERATE IMAGE + TEXT POST ($selectedLanguage)")
                     }
                 }
             }
@@ -370,20 +506,13 @@ fun GeneratorScreen(
 
         // Multi-Format Creative Pipelines Header
         Text(
-            text = "Multi-Format Creative Pipelines",
+            text = "Relatable Meme Generator",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
 
-        // MEME GENERATOR (Phase 6)
+        // MEME GENERATOR
         MemeGeneratorSection(
-            viewModel = viewModel,
-            opportunities = opportunities,
-            onNavigateToQueue = onNavigateToQueue
-        )
-
-        // REEL GENERATOR (Phase 7)
-        ReelGeneratorSection(
             viewModel = viewModel,
             opportunities = opportunities,
             onNavigateToQueue = onNavigateToQueue

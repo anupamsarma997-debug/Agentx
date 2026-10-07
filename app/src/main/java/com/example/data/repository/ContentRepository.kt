@@ -69,14 +69,16 @@ class ContentRepository(
         contentType: ContentType = ContentType.OPPORTUNITY_POST,
         platform: ContentPlatform = ContentPlatform.BOTH,
         length: ContentLength = ContentLength.SHORT,
-        imageSize: PostImageSize = PostImageSize.SQUARE
+        imageSize: PostImageSize = PostImageSize.SQUARE,
+        language: String = "ASSAMESE"
     ): ContentCreationOutcome {
         val fact = SourceFact.fromEntity(opportunity)
         val outcome = creationEngine.generateContent(
             fact = fact,
             contentType = contentType,
             platform = platform,
-            length = length
+            length = length,
+            language = language
         )
 
         if (outcome is ContentCreationOutcome.Success) {

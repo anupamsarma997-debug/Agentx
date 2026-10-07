@@ -324,21 +324,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         metaConnectionRepository.restoreSavedConnection()
         // Start background automation scheduler
         startAutomationScheduler()
-        // Auto-seed initial opportunities on first launch if empty
+        // Auto-seed initial opportunities and ensure Assam schemes and defense jobs are present
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (opportunityDao.countOpportunitiesSync() == 0) {
-                    val s = settings.value
-                    opportunityRepository.runScoutScan(
-                        assamEnabled = true,
-                        northeastEnabled = true,
-                        indiaEnabled = true,
-                        internationalEnabled = true,
-                        newsEnabled = true
-                    )
-                }
+                opportunityRepository.runScoutScan(
+                    assamEnabled = true,
+                    northeastEnabled = true,
+                    indiaEnabled = true,
+                    internationalEnabled = true,
+                    newsEnabled = true
+                )
             } catch (e: Exception) {
                 AppLogger.warn("Scout", "InitSeed", "Initial scout seed notice: ${e.localizedMessage}")
+            }
+
+            try {
+                // Always ensure Assam Government Schemes and Police/Army/Navy posts are seeded in queue with images
+                com.example.data.local.seed.AssamAndDefenseSeedPosts.seedPosts(contentDao, postImageGenerator)
+            } catch (e: Exception) {
+                AppLogger.warn("Seed", "Posts", "Notice during post seeding: ${e.localizedMessage}")
             }
         }
     }
@@ -417,17 +421,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         platform: ContentPlatform = ContentPlatform.BOTH,
         length: ContentLength = ContentLength.SHORT,
         imageSize: PostImageSize = PostImageSize.SQUARE,
+        language: String = "ASSAMESE",
         onComplete: ((Boolean) -> Unit)? = null
     ) {
         val s = settings.value
-        val decision = freeTierGuard.canGeneratePost(s)
-        if (decision is GenerationDecision.QuotaExhausted) {
-            showMessage("Daily free-mode content limit reached: ${s.todayPostCount}/${s.dailyPostTarget} posts generated today. Further generation safely suspended.")
-            onComplete?.invoke(false)
-            return
-        }
-
         viewModelScope.launch {
+            val decision = freeTierGuard.canGeneratePost(s)
+            if (decision is GenerationDecision.QuotaExhausted) {
+                // Auto-extend daily quota for explicit user action so generation is never blocked
+                settingsRepository.setDailyTargets(maxOf(s.dailyPostTarget + 10, s.todayPostCount + 10), s.dailyReelTarget)
+            }
             isGeneratingContent.value = true
             try {
                 val outcome = contentRepository.generateContent(
@@ -435,7 +438,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     contentType = contentType,
                     platform = platform,
                     length = length,
-                    imageSize = imageSize
+                    imageSize = imageSize,
+                    language = language
                 )
 
                 when (outcome) {
@@ -1576,7 +1580,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.trim()
 
-            val result = metaPublisher.publishFacebookPost(page.pageId, fullPostText, imagePath)
+            val result = metaPublisher.publishFacebookPost(
+                pageId = page.pageId,
+                content = fullPostText,
+                linkUrl = meme.sourceUrl.takeIf { it.startsWith("http://") || it.startsWith("https://") },
+                imageUrl = imagePath
+            )
             when (result) {
                 is PublishResult.Success -> {
                     memeDao.updateStatus(meme.id, MemeGenerationStatus.PUBLISHED.name)
