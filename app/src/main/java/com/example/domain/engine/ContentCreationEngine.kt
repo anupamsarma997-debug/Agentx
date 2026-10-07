@@ -246,10 +246,17 @@ class ContentCreationEngine(
                     "📢 ${fact.title}\n\n${fact.description.take(160)}...\n\n⏰ Deadline: ${fact.deadline ?: "Official site par dekhein"}\n🔗 Portal: ${fact.sourceUrl}"
                 }
 
-                val fallbackHashtags = if (isAssameseMode) {
-                    listOf("#AssamGovt", "#অসম", "#AssamSchemes", "#AssamJobs", "#JobAlertAssam", "#SLPRB", "#Agniveer")
-                } else {
-                    listOf("#Opportunity", "#Career", "#MSME", "#BharatSarkar", "#JobAlert", "#Alert")
+                val fallbackHashtags = when (contentType) {
+                    ContentType.HACKATHON_ALERT -> listOf("#Hackathon", "#Coding", "#SmartIndia", "#TechInnovation", "#Developer", "#Students")
+                    ContentType.MSME_ALERT -> listOf("#MSME", "#PMEGP", "#BharatSarkar", "#BusinessLoan", "#Subsidy", "#StartupIndia")
+                    ContentType.JOB_ALERT -> if (isAssameseMode) listOf("#AssamJobs", "#JobAlert", "#SLPRB", "#AssamPolice", "#IndianArmy", "#Agniveer") else listOf("#JobAlert", "#Recruitment", "#Career", "#GovtJobs")
+                    ContentType.SCHOLARSHIP_ALERT -> listOf("#Scholarship", "#Students", "#Education", "#Pragati", "#AICTE", "#Career")
+                    ContentType.MEME_POST -> listOf("#Relatable", "#MemeTime", "#MSME", "#StudentLife", "#DesiHumor")
+                    else -> if (isAssameseMode) {
+                        listOf("#AssamGovt", "#অসম", "#AssamSchemes", "#AssamJobs", "#JobAlertAssam")
+                    } else {
+                        listOf("#Opportunity", "#Career", "#MSME", "#BharatSarkar", "#JobAlert", "#Alert")
+                    }
                 }
 
                 val fallbackResult = GeneratedContentResult(

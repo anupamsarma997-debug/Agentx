@@ -3,6 +3,7 @@ package com.example.data.model.opportunity
 enum class OpportunityCategory(val displayName: String) {
     JOB("Jobs"),
     GOVERNMENT_JOB("Government Jobs"),
+    GOVERNMENT_SCHEME("Government Schemes"),
     INTERNSHIP("Internships"),
     SCHOLARSHIP("Scholarships"),
     MSME("MSME Schemes"),

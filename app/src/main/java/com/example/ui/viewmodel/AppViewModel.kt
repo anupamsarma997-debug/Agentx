@@ -330,6 +330,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         // Auto-seed initial opportunities and ensure Assam schemes and defense jobs are present
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Seed curated opportunities (Assam schemes, Police, Army, Navy, MSME, Hackathons, Startups, Scholarships)
+                val existingHashes = opportunityDao.getAllContentHashes().toSet()
+                val curatedToInsert = com.example.data.local.seed.CuratedOpportunityCatalog.getAllCurated()
+                    .filter { it.contentHash !in existingHashes }
+                if (curatedToInsert.isNotEmpty()) {
+                    opportunityDao.insertOpportunities(curatedToInsert)
+                }
+            } catch (e: Exception) {
+                AppLogger.warn("Seed", "Opportunities", "Notice during curated opportunity seeding: ${e.localizedMessage}")
+            }
+
+            try {
                 opportunityRepository.runScoutScan(
                     assamEnabled = true,
                     northeastEnabled = true,
@@ -436,6 +448,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             isGeneratingContent.value = true
             try {
+                if (opportunityDao.getOpportunityByIdSync(opportunity.id) == null) {
+                    opportunityDao.insertOpportunity(opportunity)
+                }
+            } catch (_: Exception) {}
+            try {
                 val outcome = contentRepository.generateContent(
                     opportunity = opportunity,
                     contentType = contentType,
@@ -526,6 +543,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         item.title.contains("অৰুন্ধতী") ||
                         item.region.contains("Assam", ignoreCase = true)
                     }
+                    "MSME_SCHEMES" -> list.filter { item ->
+                        item.category.contains("MSME", ignoreCase = true) ||
+                        item.title.contains("MSME", ignoreCase = true) ||
+                        item.title.contains("PMEGP", ignoreCase = true) ||
+                        item.title.contains("Udyam", ignoreCase = true) ||
+                        item.title.contains("Vishwakarma", ignoreCase = true) ||
+                        item.title.contains("Subsidy", ignoreCase = true) ||
+                        item.title.contains("Loan", ignoreCase = true)
+                    }
+                    "HACKATHONS" -> list.filter { item ->
+                        item.category.contains("Hackathon", ignoreCase = true) ||
+                        item.title.contains("Hackathon", ignoreCase = true) ||
+                        item.title.contains("SIH", ignoreCase = true) ||
+                        item.title.contains("Innovation Challenge", ignoreCase = true) ||
+                        item.title.contains("Challenge", ignoreCase = true)
+                    }
                     "DEFENSE_POLICE" -> list.filter { item ->
                         item.title.contains("Police", ignoreCase = true) ||
                         item.title.contains("আৰক্ষী") ||
@@ -550,7 +583,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
                 val s = settings.value
                 settingsRepository.setDailyTargets(
-                    maxOf(s.dailyPostTarget + targetList.size + 10, s.todayPostCount + targetList.size + 10),
+                    maxOf(s.dailyPostTarget + targetList.size + 15, s.todayPostCount + targetList.size + 15),
                     s.dailyReelTarget
                 )
 
@@ -574,7 +607,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         opp.category.contains("Scholarship", ignoreCase = true) ||
                         opp.title.contains("Scholarship", ignoreCase = true) -> ContentType.SCHOLARSHIP_ALERT
 
-                        opp.category.contains("Hackathon", ignoreCase = true) -> ContentType.HACKATHON_ALERT
+                        opp.category.contains("Hackathon", ignoreCase = true) ||
+                        opp.title.contains("Hackathon", ignoreCase = true) ||
+                        opp.title.contains("SIH", ignoreCase = true) -> ContentType.HACKATHON_ALERT
+
+                        opp.category.contains("MSME", ignoreCase = true) ||
+                        opp.title.contains("MSME", ignoreCase = true) ||
+                        opp.title.contains("PMEGP", ignoreCase = true) -> ContentType.MSME_ALERT
+
                         opp.category.contains("Startup", ignoreCase = true) -> ContentType.STARTUP_ALERT
                         else -> ContentType.OPPORTUNITY_POST
                     }
@@ -597,8 +637,67 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
+                // If generating ALL or MEMES, also generate curated relatable memes with all 4 sizes
+                if (categoryFilter == "ALL" || categoryFilter == "MEMES") {
+                    val memePresets = listOf(
+                        com.example.data.model.meme.MemeTopic.createSarkariSchemeTheme(
+                            "Bharat Sarkar MSME PMEGP vs Investor Pitch",
+                            "Looking for angel investors vs discovering 35% margin subsidy and ₹50 Lakh collateral-free loan"
+                        ) to com.example.data.model.meme.MemeFormat.SARKARI_SCHEME_RELATABLE,
+                        com.example.data.model.meme.MemeTopic.createGeneralTheme(
+                            "Fresher Applying For Job: Needs 5 Years Experience",
+                            "HR requirement dilemma for entry level freshers"
+                        ) to com.example.data.model.meme.MemeFormat.JOB_RELATABLE,
+                        com.example.data.model.meme.MemeTopic.createCreatorNewsTheme(
+                            "NewsBoy & Neon Man 3 AM Creator Updates",
+                            "Faster than 5G breaking creator updates and milestones"
+                        ) to com.example.data.model.meme.MemeFormat.NEWSBOY_CREATOR_STYLE
+                    )
+
+                    for ((mTopic, mFormat) in memePresets) {
+                        try {
+                            val mOutcome = memeRepository.generateAndSaveMeme(mTopic, mFormat)
+                            if (mOutcome is com.example.domain.engine.MemeGenerationOutcome.Success) {
+                                var defImage: String? = null
+                                PostImageSize.entries.forEach { sz ->
+                                    val path = postImageGenerator.generateMemeBanner(
+                                        memeId = mOutcome.draft.id,
+                                        topic = mOutcome.draft.topic,
+                                        setup = mOutcome.draft.setupText,
+                                        punchline = mOutcome.draft.punchlineText,
+                                        formatName = mOutcome.draft.memeFormat.displayName,
+                                        size = sz
+                                    )
+                                    if (sz == PostImageSize.SQUARE || defImage == null) defImage = path
+                                }
+                                val cEntity = ContentEntity(
+                                    id = mOutcome.draft.id,
+                                    sourceOpportunityId = mOutcome.draft.sourceOpportunityId ?: mOutcome.draft.id,
+                                    contentType = ContentType.MEME_POST.name,
+                                    platform = ContentPlatform.BOTH.name,
+                                    title = "😂 ${mOutcome.draft.topic}",
+                                    body = "${mOutcome.draft.setupText}\n\n👉 ${mOutcome.draft.punchlineText}\n\n${mOutcome.draft.caption}",
+                                    caption = mOutcome.draft.caption,
+                                    hashtags = mOutcome.draft.hashtags.joinToString(", "),
+                                    sourceUrl = mOutcome.draft.sourceUrl,
+                                    sourceName = mOutcome.draft.sourceName,
+                                    createdAt = mOutcome.draft.createdAt,
+                                    updatedAt = mOutcome.draft.updatedAt,
+                                    generationStatus = GenerationStatus.GENERATED.name,
+                                    verificationStatus = mOutcome.draft.verificationStatus,
+                                    aiModel = "gemini-2.5-flash",
+                                    errorMessage = null,
+                                    imageUrl = defImage
+                                )
+                                contentDao.insertContent(cEntity)
+                                successCount++
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+
                 batchProgressRatio.value = 1.0f
-                batchProgressText.value = "সকলো প্ৰস্তুত হ'ল! ($successCount/$total)"
+                batchProgressText.value = "সকলো প্ৰস্তুত হ'ল! ($successCount items)"
                 showMessage("সফলভাৱে সকলো $successCount টা পোষ্ট আৰু ৪টা আকাৰৰ বেনাৰ প্ৰস্তুত কৰা হ'ল!")
                 onComplete?.invoke(successCount)
             } catch (e: Exception) {
@@ -615,21 +714,40 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val item = contentDao.getContentByIdSync(contentId) ?: return@launch
             val appCtx = getApplication<android.app.Application>().applicationContext
-            val imagesDir = java.io.File(appCtx.filesDir, "post_images")
-            val sizeFile = java.io.File(imagesDir, "post_${item.id}_${size.id}.jpg")
-            val targetPath = if (sizeFile.exists()) {
-                sizeFile.absolutePath
+            val isMeme = item.contentType == ContentType.MEME_POST.name
+            val targetPath = if (isMeme) {
+                val memeDir = java.io.File(appCtx.filesDir, "meme_images")
+                val sizeFile = java.io.File(memeDir, "meme_${item.id}_${size.id}.jpg")
+                if (sizeFile.exists()) {
+                    sizeFile.absolutePath
+                } else {
+                    val memeDraft = memeRepository.getMemeByIdSync(item.id)
+                    postImageGenerator.generateMemeBanner(
+                        memeId = item.id,
+                        topic = memeDraft?.topic ?: item.title.removePrefix("😂 "),
+                        setup = memeDraft?.setupText ?: item.body.lines().firstOrNull() ?: item.title,
+                        punchline = memeDraft?.punchlineText ?: item.caption,
+                        formatName = memeDraft?.memeFormatEnum?.displayName ?: "Relatable Meme",
+                        size = size
+                    )
+                }
             } else {
-                postImageGenerator.generatePostBanner(
-                    contentId = item.id,
-                    title = item.title,
-                    category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
-                    organization = item.sourceName,
-                    deadline = null,
-                    sourceUrl = item.sourceUrl,
-                    region = null,
-                    size = size
-                )
+                val imagesDir = java.io.File(appCtx.filesDir, "post_images")
+                val sizeFile = java.io.File(imagesDir, "post_${item.id}_${size.id}.jpg")
+                if (sizeFile.exists()) {
+                    sizeFile.absolutePath
+                } else {
+                    postImageGenerator.generatePostBanner(
+                        contentId = item.id,
+                        title = item.title,
+                        category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                        organization = item.sourceName,
+                        deadline = null,
+                        sourceUrl = item.sourceUrl,
+                        region = null,
+                        size = size
+                    )
+                }
             }
             if (targetPath != null) {
                 contentDao.updateImageUrl(item.id, targetPath)
@@ -641,18 +759,31 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun generateAllImageSizesForPost(contentId: String) {
         viewModelScope.launch {
             val item = contentDao.getContentByIdSync(contentId) ?: return@launch
+            val isMeme = item.contentType == ContentType.MEME_POST.name
             var defaultPath: String? = null
             PostImageSize.entries.forEach { sz ->
-                val path = postImageGenerator.generatePostBanner(
-                    contentId = item.id,
-                    title = item.title,
-                    category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
-                    organization = item.sourceName,
-                    deadline = null,
-                    sourceUrl = item.sourceUrl,
-                    region = null,
-                    size = sz
-                )
+                val path = if (isMeme) {
+                    val memeDraft = memeRepository.getMemeByIdSync(item.id)
+                    postImageGenerator.generateMemeBanner(
+                        memeId = item.id,
+                        topic = memeDraft?.topic ?: item.title.removePrefix("😂 "),
+                        setup = memeDraft?.setupText ?: item.body.lines().firstOrNull() ?: item.title,
+                        punchline = memeDraft?.punchlineText ?: item.caption,
+                        formatName = memeDraft?.memeFormatEnum?.displayName ?: "Relatable Meme",
+                        size = sz
+                    )
+                } else {
+                    postImageGenerator.generatePostBanner(
+                        contentId = item.id,
+                        title = item.title,
+                        category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                        organization = item.sourceName,
+                        deadline = null,
+                        sourceUrl = item.sourceUrl,
+                        region = null,
+                        size = sz
+                    )
+                }
                 if (sz == PostImageSize.SQUARE || defaultPath == null) {
                     defaultPath = path
                 }
@@ -728,10 +859,47 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 when (outcome) {
                     is com.example.domain.engine.MemeGenerationOutcome.Success -> {
                         settingsRepository.incrementTodayPostCount()
+                        
+                        // Generate all 4 banner sizes for this meme
+                        var defMemeImage: String? = null
+                        PostImageSize.entries.forEach { sz ->
+                            val path = postImageGenerator.generateMemeBanner(
+                                memeId = outcome.draft.id,
+                                topic = outcome.draft.topic,
+                                setup = outcome.draft.setupText,
+                                punchline = outcome.draft.punchlineText,
+                                formatName = outcome.draft.memeFormat.displayName,
+                                size = sz
+                            )
+                            if (sz == PostImageSize.SQUARE || defMemeImage == null) defMemeImage = path
+                        }
+
+                        // Also insert as ContentEntity so it appears in the main queue with image & Facebook publishing
+                        val cEntity = ContentEntity(
+                            id = outcome.draft.id,
+                            sourceOpportunityId = outcome.draft.sourceOpportunityId ?: outcome.draft.id,
+                            contentType = ContentType.MEME_POST.name,
+                            platform = ContentPlatform.BOTH.name,
+                            title = "😂 ${outcome.draft.topic}",
+                            body = "${outcome.draft.setupText}\n\n👉 ${outcome.draft.punchlineText}\n\n${outcome.draft.caption}",
+                            caption = outcome.draft.caption,
+                            hashtags = outcome.draft.hashtags.joinToString(", "),
+                            sourceUrl = outcome.draft.sourceUrl,
+                            sourceName = outcome.draft.sourceName,
+                            createdAt = outcome.draft.createdAt,
+                            updatedAt = outcome.draft.updatedAt,
+                            generationStatus = GenerationStatus.GENERATED.name,
+                            verificationStatus = outcome.draft.verificationStatus,
+                            aiModel = "gemini-2.5-flash",
+                            errorMessage = null,
+                            imageUrl = defMemeImage
+                        )
+                        contentDao.insertContent(cEntity)
+
                         val statusMsg = if (outcome.draft.safetyStatus == com.example.data.model.meme.MemeSafetyStatus.NEEDS_REVIEW) {
-                            "Meme concept generated (Needs editorial review)."
+                            "Meme concept & 4 banner sizes generated (Needs editorial review)."
                         } else {
-                            "Meme concept generated successfully!"
+                            "Meme concept & all 4 banner sizes generated successfully!"
                         }
                         showMessage(statusMsg)
                         onComplete?.invoke(true)

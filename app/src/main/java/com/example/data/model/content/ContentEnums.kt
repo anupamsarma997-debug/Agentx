@@ -7,6 +7,8 @@ enum class ContentType(val displayName: String) {
     SCHOLARSHIP_ALERT("Scholarship Alert"),
     GRANT_ALERT("Grant Alert"),
     HACKATHON_ALERT("Hackathon Alert"),
+    MSME_ALERT("MSME Scheme Alert"),
+    MEME_POST("Meme Post"),
     STARTUP_ALERT("Startup Alert"),
     GENERAL_INFORMATION("General Information");
 

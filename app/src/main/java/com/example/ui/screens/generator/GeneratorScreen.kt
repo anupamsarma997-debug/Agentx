@@ -3,6 +3,8 @@
 package com.example.ui.screens.generator
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -255,6 +258,42 @@ fun GeneratorScreen(
 
                         OutlinedButton(
                             onClick = {
+                                viewModel.batchGenerateAllOpportunities("MSME_SCHEMES", langParam) {
+                                    onNavigateToQueue()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_batch_msme")
+                        ) {
+                            Text("🏢 All MSME Schemes", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.batchGenerateAllOpportunities("HACKATHONS", langParam) {
+                                    onNavigateToQueue()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_batch_hackathons")
+                        ) {
+                            Text("💻 All Hackathons", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.batchGenerateAllOpportunities("MEMES", langParam) {
+                                    onNavigateToQueue()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_batch_memes")
+                        ) {
+                            Text("😂 All Memes", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
                                 viewModel.batchGenerateAllOpportunities("ASSAM_SCHEMES", langParam) {
                                     onNavigateToQueue()
                                 }
@@ -262,7 +301,7 @@ fun GeneratorScreen(
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.testTag("btn_batch_assam_schemes")
                         ) {
-                            Text("🏛️ All Assam Schemes (${opportunities.count { it.region.contains("Assam", ignoreCase = true) }})", style = MaterialTheme.typography.labelSmall)
+                            Text("🏛️ All Assam Schemes", style = MaterialTheme.typography.labelSmall)
                         }
 
                         OutlinedButton(
@@ -316,25 +355,132 @@ fun GeneratorScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 1-Tap Quick Presets for Assam Schemes & Defense
+                // 1-Tap Quick Presets for All Categories
                 Text(
-                    text = "🌟 ১-টেপ বাছনি: অসম চৰকাৰৰ আঁচনি আৰু সুৰক্ষা নিযুক্তি",
+                    text = "🌟 ১-টেপ বাছনি (1-Tap Selection): আঁচনি, উদ্যোগ, হেকাথন আৰু মিম",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "তলৰ যিকোনো এটা ক্লিক কৰক - স্বয়ংক্ৰিয়ভাৱে ছবি আৰু তথ্য লোড হ'ব:",
+                    text = "যিকোনো এটা ক্লিক কৰক - সেই শিতানৰ তথ্য, ফৰ্মেট আৰু সকলো ৪টা আকাৰৰ বেনাৰ লোড হ'ব:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                // Assam Schemes Chips
+                // 1. MSME & Business Schemes Chips
                 Text(
-                    text = "অসমৰ মুখ্য আঁচনিসমূহ (Assam Flagship Asoni):",
+                    text = "🏢 MSME চৰকাৰী ঋণ আৰু উদ্যোগ (MSME & Business Schemes):",
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val msmePresets = listOf(
+                        "MSME PMEGP (₹50L Loan 35% Subsidy)" to "PMEGP",
+                        "Udyam পঞ্জীয়ন (Zero Cost)" to "Udyam",
+                        "PM বিশ্বকৰ্মা (Vishwakarma Loan)" to "Vishwakarma"
+                    )
+                    msmePresets.forEach { (label, keyword) ->
+                        val isSelected = selectedOpportunity?.title?.contains(keyword, ignoreCase = true) == true
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                val match = opportunities.firstOrNull {
+                                    it.title.contains(keyword, ignoreCase = true) || it.category.contains("MSME", ignoreCase = true)
+                                }
+                                if (match != null) {
+                                    selectedOpportunity = match
+                                }
+                                selectedLanguage = "অসমীয়া (Assamese)"
+                                selectedContentType = ContentType.MSME_ALERT
+                            },
+                            label = { Text("🏢 $label") }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 2. Hackathons & Tech Challenges Chips
+                Text(
+                    text = "💻 হেকাথন আৰু উদ্ভাৱনী প্ৰতিযোগিতা (Hackathons & Tech):",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val hackathonPresets = listOf(
+                        "Smart India Hackathon (SIH 2026)" to "Smart India",
+                        "MyGov Innovation Challenge" to "MyGov"
+                    )
+                    hackathonPresets.forEach { (label, keyword) ->
+                        val isSelected = selectedOpportunity?.title?.contains(keyword, ignoreCase = true) == true
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                val match = opportunities.firstOrNull {
+                                    it.title.contains(keyword, ignoreCase = true) || it.category.contains("Hackathon", ignoreCase = true)
+                                }
+                                if (match != null) {
+                                    selectedOpportunity = match
+                                }
+                                selectedContentType = ContentType.HACKATHON_ALERT
+                            },
+                            label = { Text("💻 $label") }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 3. Relatable Memes Chips
+                Text(
+                    text = "😂 ৰিলেটেবল মিম আৰু হাস্যৰস (Relatable Humor & Memes):",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFD97706)
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val memePresets = listOf(
+                        "MSME vs Angel Investors" to "MSME",
+                        "Fresher 5 Yrs Experience" to "Fresher",
+                        "NewsBoy Creator Updates" to "NewsBoy",
+                        "Exam Night Preparation" to "Exam"
+                    )
+                    memePresets.forEach { (label, _) ->
+                        FilterChip(
+                            selected = selectedContentType == ContentType.MEME_POST && selectedOpportunity?.title?.contains(label) == true,
+                            onClick = {
+                                selectedContentType = ContentType.MEME_POST
+                                val match = opportunities.firstOrNull { it.category.contains("MSME", ignoreCase = true) }
+                                    ?: opportunities.firstOrNull()
+                                if (match != null) {
+                                    selectedOpportunity = match
+                                }
+                            },
+                            label = { Text("😂 $label") }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 4. Assam Schemes Chips
+                Text(
+                    text = "🏛️ অসমৰ মুখ্য আঁচনিসমূহ (Assam Flagship Asoni):",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -367,13 +513,13 @@ fun GeneratorScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Defense & Police Chips
+                // 5. Defense & Police Chips
                 Text(
-                    text = "আৰক্ষী আৰু প্ৰতিৰক্ষা বাহিনী (Police, Army, Navy & Merchant Navy):",
+                    text = "🛡️ আৰক্ষী আৰু প্ৰতিৰক্ষা বাহিনী (Police, Army, Navy & Merchant Navy):",
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Bold
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -399,6 +545,40 @@ fun GeneratorScreen(
                                 selectedContentType = ContentType.JOB_ALERT
                             },
                             label = { Text("🛡️ $label") }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 6. Scholarships Chips
+                Text(
+                    text = "🎓 ছাত্ৰ-ছাত্ৰীৰ বৃত্তি (Scholarships):",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val scholarshipPresets = listOf(
+                        "AICTE প্ৰগতি বৃত্তি (Pragati Girls)" to "Pragati",
+                        "NSP কেন্দ্ৰীয় বৃত্তি (NSP Portal)" to "NSP",
+                        "সক্ষম বিশেষ বৃত্তি (Saksham)" to "Saksham"
+                    )
+                    scholarshipPresets.forEach { (label, keyword) ->
+                        FilterChip(
+                            selected = selectedOpportunity?.title?.contains(keyword, ignoreCase = true) == true,
+                            onClick = {
+                                val match = opportunities.firstOrNull {
+                                    it.title.contains(keyword, ignoreCase = true) || it.category.contains("Scholarship", ignoreCase = true)
+                                }
+                                if (match != null) {
+                                    selectedOpportunity = match
+                                }
+                                selectedContentType = ContentType.SCHOLARSHIP_ALERT
+                            },
+                            label = { Text("🎓 $label") }
                         )
                     }
                 }
@@ -505,10 +685,12 @@ fun GeneratorScreen(
 
                 val formats = listOf(
                     ContentType.OPPORTUNITY_POST,
-                    ContentType.NEWS_POST,
+                    ContentType.MSME_ALERT,
+                    ContentType.HACKATHON_ALERT,
+                    ContentType.MEME_POST,
                     ContentType.JOB_ALERT,
                     ContentType.SCHOLARSHIP_ALERT,
-                    ContentType.HACKATHON_ALERT,
+                    ContentType.NEWS_POST,
                     ContentType.STARTUP_ALERT
                 )
 
@@ -519,7 +701,51 @@ fun GeneratorScreen(
                     formats.forEach { format ->
                         FilterChip(
                             selected = selectedContentType == format,
-                            onClick = { selectedContentType = format },
+                            onClick = {
+                                selectedContentType = format
+                                when (format) {
+                                    ContentType.HACKATHON_ALERT -> {
+                                        val match = opportunities.firstOrNull {
+                                            it.category.contains("Hackathon", ignoreCase = true) ||
+                                            it.title.contains("Hackathon", ignoreCase = true) ||
+                                            it.title.contains("SIH", ignoreCase = true)
+                                        }
+                                        if (match != null) selectedOpportunity = match
+                                    }
+                                    ContentType.MSME_ALERT -> {
+                                        val match = opportunities.firstOrNull {
+                                            it.category.contains("MSME", ignoreCase = true) ||
+                                            it.title.contains("MSME", ignoreCase = true) ||
+                                            it.title.contains("PMEGP", ignoreCase = true) ||
+                                            it.title.contains("Udyam", ignoreCase = true)
+                                        }
+                                        if (match != null) selectedOpportunity = match
+                                    }
+                                    ContentType.JOB_ALERT -> {
+                                        val match = opportunities.firstOrNull {
+                                            it.category.contains("Recruitment", ignoreCase = true) ||
+                                            it.category.contains("Job", ignoreCase = true) ||
+                                            it.title.contains("Police", ignoreCase = true) ||
+                                            it.title.contains("Army", ignoreCase = true)
+                                        }
+                                        if (match != null) selectedOpportunity = match
+                                    }
+                                    ContentType.SCHOLARSHIP_ALERT -> {
+                                        val match = opportunities.firstOrNull {
+                                            it.category.contains("Scholarship", ignoreCase = true) ||
+                                            it.title.contains("Scholarship", ignoreCase = true) ||
+                                            it.title.contains("Pragati", ignoreCase = true)
+                                        }
+                                        if (match != null) selectedOpportunity = match
+                                    }
+                                    ContentType.MEME_POST -> {
+                                        val match = opportunities.firstOrNull { it.category.contains("MSME", ignoreCase = true) }
+                                            ?: opportunities.firstOrNull()
+                                        if (match != null) selectedOpportunity = match
+                                    }
+                                    else -> {}
+                                }
+                            },
                             label = { Text(format.displayName) }
                         )
                     }
@@ -600,28 +826,42 @@ fun GeneratorScreen(
                 // Action Button: GENERATE DRAFT
                 Button(
                     onClick = {
-                        selectedOpportunity?.let { opp ->
-                            val langParam = when {
-                                selectedLanguage.startsWith("অসমীয়া") -> "ASSAMESE"
-                                selectedLanguage.startsWith("বাংলা") -> "BENGALI"
-                                selectedLanguage.startsWith("Hindi") -> "HINDI"
-                                else -> "ENGLISH"
-                            }
-                            viewModel.generateContentForOpportunity(
-                                opportunity = opp,
-                                contentType = selectedContentType,
-                                platform = selectedPlatform,
-                                length = selectedLength,
-                                imageSize = selectedImageSize,
-                                language = langParam
-                            ) { success ->
+                        val langParam = when {
+                            selectedLanguage.startsWith("অসমীয়া") -> "ASSAMESE"
+                            selectedLanguage.startsWith("বাংলা") -> "BENGALI"
+                            selectedLanguage.startsWith("Hindi") -> "HINDI"
+                            else -> "ENGLISH"
+                        }
+
+                        if (selectedContentType == ContentType.MEME_POST) {
+                            val topic = selectedOpportunity?.let { MemeTopic.fromOpportunity(it) }
+                                ?: MemeTopic.createSarkariSchemeTheme(
+                                    "Bharat Sarkar MSME PMEGP vs Investor Pitch",
+                                    "Looking for angel investors vs discovering 35% margin subsidy and ₹50 Lakh collateral-free loan"
+                                )
+                            viewModel.generateMeme(topic, MemeFormat.SARKARI_SCHEME_RELATABLE) { success ->
                                 if (success) {
                                     onNavigateToQueue()
                                 }
                             }
+                        } else {
+                            selectedOpportunity?.let { opp ->
+                                viewModel.generateContentForOpportunity(
+                                    opportunity = opp,
+                                    contentType = selectedContentType,
+                                    platform = selectedPlatform,
+                                    length = selectedLength,
+                                    imageSize = selectedImageSize,
+                                    language = langParam
+                                ) { success ->
+                                    if (success) {
+                                        onNavigateToQueue()
+                                    }
+                                }
+                            }
                         }
                     },
-                    enabled = !isGenerating && selectedOpportunity != null,
+                    enabled = !isGenerating && (selectedOpportunity != null || selectedContentType == ContentType.MEME_POST),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -638,7 +878,12 @@ fun GeneratorScreen(
                     } else {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("GENERATE THIS POST ($selectedLanguage)")
+                        val btnLabel = if (selectedContentType == ContentType.MEME_POST) {
+                            "GENERATE MEME POST & ALL 4 SIZES"
+                        } else {
+                            "GENERATE ${selectedContentType.displayName.uppercase()} ($selectedLanguage)"
+                        }
+                        Text(btnLabel)
                     }
                 }
 
@@ -686,49 +931,126 @@ fun GeneratorScreen(
 
     // Source Selection Dialog
     if (showSourceSelectorDialog) {
+        var dialogSearchQuery by remember { mutableStateOf("") }
+        var dialogCategoryFilter by remember { mutableStateOf("ALL") }
+
         AlertDialog(
             onDismissRequest = { showSourceSelectorDialog = false },
             title = { Text("Choose Opportunity Source") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (opportunities.isEmpty()) {
-                        Text("No opportunities found. Run Opportunity Scout first.")
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = dialogSearchQuery,
+                        onValueChange = { dialogSearchQuery = it },
+                        placeholder = { Text("Search schemes, hackathons, MSME...") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().testTag("input_search_opportunity_dialog")
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf(
+                            "ALL" to "All",
+                            "MSME" to "MSME",
+                            "HACKATHONS" to "Hackathons",
+                            "ASSAM" to "Assam Schemes",
+                            "DEFENSE" to "Police/Defense",
+                            "SCHOLARSHIPS" to "Scholarships"
+                        ).forEach { (key, label) ->
+                            FilterChip(
+                                selected = dialogCategoryFilter == key,
+                                onClick = { dialogCategoryFilter = key },
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val filteredList = opportunities.filter { opp ->
+                        val matchesSearch = dialogSearchQuery.isBlank() ||
+                            opp.title.contains(dialogSearchQuery, ignoreCase = true) ||
+                            opp.category.contains(dialogSearchQuery, ignoreCase = true) ||
+                            opp.sourceName.contains(dialogSearchQuery, ignoreCase = true)
+
+                        val matchesCategory = when (dialogCategoryFilter) {
+                            "MSME" -> opp.category.contains("MSME", ignoreCase = true) || opp.title.contains("MSME", ignoreCase = true) || opp.title.contains("PMEGP", ignoreCase = true) || opp.title.contains("Udyam", ignoreCase = true)
+                            "HACKATHONS" -> opp.category.contains("Hackathon", ignoreCase = true) || opp.title.contains("Hackathon", ignoreCase = true) || opp.title.contains("SIH", ignoreCase = true)
+                            "ASSAM" -> opp.region.contains("Assam", ignoreCase = true) || opp.title.contains("Orunodoi", ignoreCase = true) || opp.title.contains("Nijut", ignoreCase = true)
+                            "DEFENSE" -> opp.title.contains("Police", ignoreCase = true) || opp.title.contains("Army", ignoreCase = true) || opp.title.contains("Navy", ignoreCase = true) || opp.category.contains("Recruitment", ignoreCase = true)
+                            "SCHOLARSHIPS" -> opp.category.contains("Scholarship", ignoreCase = true) || opp.title.contains("Scholarship", ignoreCase = true) || opp.title.contains("Pragati", ignoreCase = true)
+                            else -> true
+                        }
+                        matchesSearch && matchesCategory
+                    }
+
+                    if (filteredList.isEmpty()) {
+                        Text(
+                            text = "No matching opportunities found.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
                     } else {
-                        opportunities.forEach { opp ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        selectedOpportunity = opp
-                                        showSourceSelectorDialog = false
-                                    },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (selectedOpportunity?.id == opp.id) {
-                                        MaterialTheme.colorScheme.primaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.surface
-                                    }
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Text(
-                                        text = opp.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(320.dp)
+                        ) {
+                            items(filteredList, key = { it.id }) { opp ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            selectedOpportunity = opp
+                                            when {
+                                                opp.category.contains("Hackathon", ignoreCase = true) || opp.title.contains("Hackathon", ignoreCase = true) -> {
+                                                    selectedContentType = ContentType.HACKATHON_ALERT
+                                                }
+                                                opp.category.contains("MSME", ignoreCase = true) || opp.title.contains("MSME", ignoreCase = true) || opp.title.contains("PMEGP", ignoreCase = true) -> {
+                                                    selectedContentType = ContentType.MSME_ALERT
+                                                }
+                                                opp.title.contains("Police", ignoreCase = true) || opp.title.contains("Army", ignoreCase = true) || opp.title.contains("Navy", ignoreCase = true) -> {
+                                                    selectedContentType = ContentType.JOB_ALERT
+                                                }
+                                                opp.category.contains("Scholarship", ignoreCase = true) || opp.title.contains("Scholarship", ignoreCase = true) -> {
+                                                    selectedContentType = ContentType.SCHOLARSHIP_ALERT
+                                                }
+                                            }
+                                            showSourceSelectorDialog = false
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (selectedOpportunity?.id == opp.id) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.surface
+                                        }
                                     )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
                                         Text(
-                                            text = "${opp.sourceName} | ${opp.regionEnum.displayName}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            text = opp.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
-                                        VerificationBadge(status = opp.verificationStatusEnum)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${opp.sourceName} | ${opp.regionEnum.displayName}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            VerificationBadge(status = opp.verificationStatusEnum)
+                                        }
                                     }
                                 }
                             }

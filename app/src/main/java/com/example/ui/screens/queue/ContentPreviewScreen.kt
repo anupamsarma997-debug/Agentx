@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -302,8 +303,10 @@ fun ContentPreviewScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
                         ) {
                             PostImageSize.entries.forEach { size ->
                                 FilterChip(
@@ -312,7 +315,7 @@ fun ContentPreviewScreen(
                                         selectedImageSize = size
                                         viewModel.switchOrGeneratePostImageSize(content.id, size)
                                     },
-                                    label = { Text(size.aspectRatioLabel) },
+                                    label = { Text("${size.displayName} (${size.aspectRatioLabel})") },
                                     modifier = Modifier.testTag("preview_size_chip_${size.id}")
                                 )
                             }
