@@ -199,17 +199,17 @@ object CuratedOpportunityCatalog {
     // 3. MSME SCHEMES & SUBSIDIES
     val MSME_PMEGP = OpportunityEntity(
         id = "curated_msme_pmegp",
-        title = "Ministry of MSME PMEGP Scheme 2026 - 35% Subsidy Loans up to ₹50 Lakhs",
-        description = "Prime Minister's Employment Generation Programme providing bank financing up to ₹50 Lakhs for manufacturing projects and ₹20 Lakhs for service units with 15% to 35% government subsidy.",
+        title = "পিএমইজিপি উদ্যোগ আঁচনি ২০২৬ (MSME PMEGP Scheme) - ৩৫% চৰকাৰী ৰাজসাহায্য আৰু ₹৫০ লাখ ঋণ",
+        description = "প্ৰধানমন্ত্ৰী ৰোজগাৰ সৃষ্টি কাৰ্যসূচীৰ অধীনত উৎপাদন খণ্ডত ₹৫০ লাখ আৰু সেৱা খণ্ডত ₹২০ লাখলৈকে বেংক ঋণ। গ্ৰামাঞ্চলত ৩৫% আৰু চহৰাঞ্চলত ২৫% চৰকাৰী মাৰ্জিন মানি ৰাজসাহায্য।",
         category = OpportunityCategory.MSME.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "KVIC & Ministry of MSME",
+        sourceName = "KVIC আৰু কেন্দ্ৰীয় MSME মন্ত্ৰালয়",
         sourceUrl = "https://kviconline.gov.in/pmegpeportal",
         sourceDomain = "kviconline.gov.in",
         publishedAt = "2026-10-01",
         deadline = "31/03/2027",
-        eligibility = "Any individual above 18 years; at least 8th pass for manufacturing projects over ₹10 Lakhs.",
-        organization = "Khadi and Village Industries Commission (KVIC)",
+        eligibility = "১৮ বছৰৰ ঊৰ্ধ্বৰ যিকোনো যুৱক-যুৱতী বা উদ্যোগী; উৎপাদন খণ্ডত ₹১০ লাখ আৰু সেৱা খণ্ডত ₹৫ লাখৰ ওপৰৰ প্ৰকল্পৰ বাবে নিম্নতম ৮ম শ্ৰেণী উত্তীৰ্ণ হ'ব লাগিব।",
+        organization = "Khadi and Village Industries Commission (KVIC), Ministry of MSME",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
         contentHash = "hash_curated_msme_pmegp"
@@ -217,16 +217,16 @@ object CuratedOpportunityCatalog {
 
     val MSME_UDYAM = OpportunityEntity(
         id = "curated_msme_udyam",
-        title = "Udyam Zero-Cost Registration & MSME Champions Subsidy Portal",
-        description = "Official paperless zero-fee MSME registration enabling collateral-free bank loans, priority sector lending, 50% patent discount, and delayed payment statutory protection under MSEFC.",
+        title = "উদ্যম বিনামূলীয়া পঞ্জীয়ন (Udyam MSME Zero-Cost Registration) - বিনা জামিনত ঋণ আৰু সুতৰ ৰেহাই",
+        description = "কেন্দ্ৰীয় MSME মন্ত্ৰালয়ৰ ডিজিটেল পেপাৰলেছ পঞ্জীয়ন পৰ্টেল। কোনো মাচুল নোহোৱাকৈ পঞ্জীয়ন কৰি বেংকৰ পৰা বিনা জামিনত প্ৰাথমিক ঋণ, সুতৰ ৰেহাই আৰু চৰকাৰী ক্ৰয়ত অগ্ৰাধিকাৰ লাভ কৰক।",
         category = OpportunityCategory.MSME.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "Ministry of MSME",
+        sourceName = "কেন্দ্ৰীয় MSME মন্ত্ৰালয়, ভাৰত চৰকাৰ",
         sourceUrl = "https://udyamregistration.gov.in",
         sourceDomain = "udyamregistration.gov.in",
         publishedAt = "2026-10-02",
         deadline = "31/12/2027",
-        eligibility = "Micro, Small, and Medium Enterprises with valid Aadhaar and PAN card.",
+        eligibility = "বৈধ আধাৰ কাৰ্ড আৰু পেন কাৰ্ড থকা যিকোনো ক্ষুদ্ৰ, লঘু বা মজলীয়া উদ্যোগী, দোকান বা ব্যৱসায়িক প্ৰতিষ্ঠান।",
         organization = "Ministry of MSME, Govt of India",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
@@ -235,17 +235,17 @@ object CuratedOpportunityCatalog {
 
     val MSME_VISHWAKARMA = OpportunityEntity(
         id = "curated_msme_vishwakarma",
-        title = "PM Vishwakarma Yojana - ₹3 Lakh Low-Interest Loans & Free Toolkits",
-        description = "Financial assistance, ₹15,000 modern toolkit e-vouchers, and 5% interest loans up to ₹3 Lakhs for traditional artisans, carpenters, weavers, sculptors, and blacksmiths.",
+        title = "পিএম বিশ্বকৰ্মা যোজনা (PM Vishwakarma Scheme) - ₹৩ লাখ ৫% সুতৰ ঋণ আৰু ₹১৫,০০০ বিনামূলীয়া সঁজুলি",
+        description = "থলুৱা শিল্পী, কাৰিকৰ, সোণাৰী, কমাৰ, কুমাৰ, বাঢ়ৈ আৰু হস্তশিল্পীক আধুনিক প্ৰশিক্ষণ, দৈনিক ₹৫০০ ষ্টাইপেণ্ড, ₹১৫,০০০ বিনামূলীয়া টুলকিট আৰু ৫% ৰেহাই সুতত ₹৩ লাখলৈকে ঋণ।",
         category = OpportunityCategory.MSME.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "Ministry of MSME & Skill Development",
+        sourceName = "MSME আৰু দক্ষতা বিকাশ মন্ত্ৰালয়",
         sourceUrl = "https://pmvishwakarma.gov.in",
         sourceDomain = "pmvishwakarma.gov.in",
         publishedAt = "2026-10-01",
         deadline = "31/12/2027",
-        eligibility = "Artisans and craftspeople working with hands and tools in 18 eligible traditional trades.",
-        organization = "Government of India",
+        eligibility = "১৮ টা নিৰ্ধাৰিত পাৰম্পৰিক বৃত্তিত নিজ হাতেৰে কাম কৰা ১৮ বছৰৰ ঊৰ্ধ্বৰ কাৰিকৰ আৰু শিল্পীসকল।",
+        organization = "Ministry of MSME & Skill Development, Govt of India",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
         contentHash = "hash_curated_msme_vishwakarma"
@@ -254,17 +254,17 @@ object CuratedOpportunityCatalog {
     // 4. HACKATHONS
     val SMART_INDIA_HACKATHON = OpportunityEntity(
         id = "curated_sih_hackathon",
-        title = "Smart India Hackathon (SIH 2026) - National Student Innovation Challenge",
-        description = "World's largest open innovation hackathon for engineering and college students. Hardware and software problem statements from Central Ministries and industries with ₹1 Lakh prize per problem.",
+        title = "স্মাৰ্ট ইণ্ডিয়া হেকাথন ২০২৬ (Smart India Hackathon - SIH 2026) - সৰ্বভাৰতীয় উদ্ভাৱন প্ৰতিযোগিতা",
+        description = "ভাৰত চৰকাৰৰ শিক্ষা মন্ত্ৰালয় আৰু AICTE ৰ উদ্যোগত বিশ্বৰ সৰ্ববৃহৎ মুকলি উদ্ভাৱনী প্ৰতিযোগিতা। কেন্দ্ৰীয় মন্ত্ৰালয় আৰু উদ্যোগৰ সমস্যা সমাধান কৰি প্ৰতিটো প্ৰকল্পত ₹১ লাখ পুৰস্কাৰ লাভ কৰক।",
         category = OpportunityCategory.HACKATHON.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "Ministry of Education & AICTE",
+        sourceName = "শিক্ষা মন্ত্ৰালয় আৰু AICTE উদ্ভাৱন কোষ",
         sourceUrl = "https://sih.gov.in",
         sourceDomain = "sih.gov.in",
         publishedAt = "2026-10-01",
         deadline = "15/04/2027",
-        eligibility = "Teams of 6 college/university students with at least 1 female teammate; open to all engineering, science, and polytechnic disciplines.",
-        organization = "AICTE Innovation Cell & MoE",
+        eligibility = "প্ৰতিটো দলত ৬ গৰাকী কলেজ/বিশ্ববিদ্যালয়ৰ ছাত্ৰ-ছাত্ৰী আৰু কমেও এগৰাকী ছাত্ৰী থাকিব লাগিব। সকলো অভিযান্ত্ৰিক আৰু বিজ্ঞান শাখাৰ বাবে উন্মুক্ত।",
+        organization = "AICTE Innovation Cell & Ministry of Education",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
         contentHash = "hash_curated_sih_hackathon"
@@ -272,17 +272,17 @@ object CuratedOpportunityCatalog {
 
     val MYGOV_HACKATHON = OpportunityEntity(
         id = "curated_mygov_hackathon",
-        title = "MyGov Innovation Challenge - Civic AI & Digital India Tech Competition",
-        description = "National open technology competition building open-source civic technology, digital governance prototypes, and AI applications with incubation support and cash awards.",
+        title = "MyGov উদ্ভাৱনী প্ৰত্যাহ্বান (Civic AI & Digital India Tech Competition) - নগদ পুৰস্কাৰ আৰু ইনকিউবেচন",
+        description = "মুক্ত প্ৰযুক্তি প্ৰতিযোগিতা; ডিজিটেল প্ৰশাসন, AI এপ্লিকেচন আৰু নাগৰিক সেৱাৰ প্ৰট'টাইপ নিৰ্মাণৰ বাবে নগদ পুৰস্কাৰ, প্ৰমাণপত্ৰ আৰু ৰাষ্ট্ৰীয় পৰ্যায়ত ইনকিউবেচন সুবিধা।",
         category = OpportunityCategory.HACKATHON.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "MyGov India & MeitY",
+        sourceName = "MyGov India আৰু MeitY",
         sourceUrl = "https://innovateindia.mygov.in",
         sourceDomain = "innovateindia.mygov.in",
         publishedAt = "2026-09-29",
         deadline = "30/03/2027",
-        eligibility = "Indian developers, students, researchers, startups, and open-source contributors.",
-        organization = "Ministry of Electronics & Information Technology",
+        eligibility = "ভাৰতীয় ডেভেলপাৰ, কলেজীয়া ছাত্ৰ-ছাত্ৰী, গৱেষক আৰু অপেন-ছ'ৰ্চ কন্ট্ৰিবিউটৰসকলৰ বাবে পোনপটীয়া প্ৰৱেশ।",
+        organization = "Ministry of Electronics & IT (MeitY)",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
         contentHash = "hash_curated_mygov_hackathon"
@@ -291,17 +291,17 @@ object CuratedOpportunityCatalog {
     // 5. STARTUPS
     val STARTUP_INDIA_SEED = OpportunityEntity(
         id = "curated_startup_india_seed",
-        title = "Startup India Seed Fund Scheme (SISFS) - Up to ₹50 Lakh Grant & Debt",
-        description = "Financial assistance to DPIIT-recognized early-stage startups for proof of concept, prototype development, product trials, market entry, and commercialization through approved incubators.",
+        title = "ষ্টাৰ্টআপ ইণ্ডিয়া বীজ পুঁজি আঁচনি (Startup India Seed Fund - SISFS) - ₹৫০ লাখলৈ অনুদান আৰু ঋণ",
+        description = "নতুন উদ্ভাৱনী ষ্টাৰ্টআপসমূহৰ প্ৰট'টাইপ বিকাশ, প্ৰডাক্ট পৰীক্ষণ আৰু বজাৰ প্ৰৱেশৰ বাবে অনুমোদিত ইনকিউবেটৰৰ জৰিয়তে ₹৫০ লাখলৈকে আৰ্থিক সাহায্য আৰু বিনিয়োগ।",
         category = OpportunityCategory.STARTUP.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "DPIIT & Startup India",
+        sourceName = "DPIIT আৰু ষ্টাৰ্টআপ ইণ্ডিয়া",
         sourceUrl = "https://seedfund.startupindia.gov.in",
         sourceDomain = "seedfund.startupindia.gov.in",
         publishedAt = "2026-10-01",
         deadline = "31/12/2027",
-        eligibility = "DPIIT-recognized startups incorporated not more than 2 years ago, with a scalable business idea.",
-        organization = "Department for Promotion of Industry and Internal Trade",
+        eligibility = "DPIIT দ্বাৰা স্বীকৃতিপ্ৰাপ্ত আৰু পঞ্জীয়নৰ ২ বছৰৰ ভিতৰত থকা ব্যৱসায়িক ধাৰণাযুক্ত ষ্টাৰ্টআপ।",
+        organization = "Department for Promotion of Industry and Internal Trade (DPIIT)",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
         contentHash = "hash_curated_startup_india_seed"
@@ -309,16 +309,16 @@ object CuratedOpportunityCatalog {
 
     val ASSAM_STARTUP_NEST = OpportunityEntity(
         id = "curated_assam_startup_nest",
-        title = "Assam Startup 'The Nest' - Incubation, Seed Funding & Mentorship Cohort",
-        description = "Assam government flagship startup incubator in collaboration with IIM Calcutta Innovation Park. Up to ₹50 Lakhs grant funding, dedicated co-working space, and investor access.",
+        title = "অসম ষ্টাৰ্টআপ 'দ্য নেষ্ট' (Assam Startup The Nest) - ₹৫০ লাখ পুঁজি আৰু আইআইএম কলকাতা মেন্টৰশ্বিপ",
+        description = "অসম চৰকাৰৰ ফ্লেগশ্বিপ ষ্টাৰ্টআপ ইনকিউবেটৰ। আইআইএম কলকাতা ইনোভেচন পাৰ্কৰ সহযোগত কো-ৱৰ্কিং স্পেচ, ₹৫০ লাখ অনুদান পুঁজি আৰু বিনিয়োগকাৰীৰ সৈতে পোনপটীয়া সংযোগ।",
         category = OpportunityCategory.STARTUP.name,
         region = OpportunityRegion.ASSAM.name,
-        sourceName = "Assam Startup & IIM Calcutta Innovation Park",
+        sourceName = "উদ্যোগ আৰু বাণিজ্য বিভাগ, অসম চৰকাৰ",
         sourceUrl = "https://startup.assam.gov.in",
         sourceDomain = "startup.assam.gov.in",
         publishedAt = "2026-09-30",
         deadline = "31/03/2027",
-        eligibility = "Startups headquartered in Assam or North East with innovative products in agriculture, health, education, IT, or green energy.",
+        eligibility = "অসম বা উত্তৰ-পূৰ্বাঞ্চলত মুখ্য কাৰ্যালয় থকা আৰু কৃষি, স্বাস্থ্য, শিক্ষা বা সেউজ শক্তিত কাম কৰা ষ্টাৰ্টআপ।",
         organization = "Industries & Commerce Department, Govt of Assam",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
@@ -328,16 +328,16 @@ object CuratedOpportunityCatalog {
     // 6. SCHOLARSHIPS
     val AICTE_PRAGATI = OpportunityEntity(
         id = "curated_aicte_pragati",
-        title = "AICTE Pragati Scholarship for Girl Students - ₹50,000 Annual Grant",
-        description = "Scholarship scheme by AICTE providing ₹50,000 per year towards college tuition fees and study materials for girls admitted to first-year technical degree/diploma courses.",
+        title = "AICTE প্ৰগতি ছাত্ৰী বৃত্তি ২০২৬ (AICTE Pragati Scholarship) - বছৰি ₹৫০,০০০ আৰ্থিক অনুদান",
+        description = "কাৰিকৰী শিক্ষা গ্ৰহণ কৰা মেধাৱী ছাত্ৰীসকলৰ বাবে AICTE ৰ বিশেষ বৃত্তি। প্ৰথম বৰ্ষৰ ডিগ্ৰী বা ডিপ্লমা পাঠ্যক্ৰমত নামভৰ্তি কৰা ছাত্ৰীক বছৰি ₹৫০,০০০ কৈ সাহায্য।",
         category = OpportunityCategory.SCHOLARSHIP.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "All India Council for Technical Education (AICTE)",
+        sourceName = "সৰ্বভাৰতীয় কাৰিকৰী শিক্ষা পৰিষদ (AICTE)",
         sourceUrl = "https://www.aicte-india.org",
         sourceDomain = "aicte-india.org",
         publishedAt = "2026-10-01",
         deadline = "31/01/2027",
-        eligibility = "Female students admitted to AICTE approved technical degree/diploma program; family income less than ₹8 Lakhs per annum.",
+        eligibility = "AICTE অনুমোদিত প্ৰতিষ্ঠানত প্ৰথম বৰ্ষত নামভৰ্তি কৰা ছাত্ৰী; পৰিয়ালৰ বাৰ্ষিক আয় ₹৮ লাখতকৈ কম।",
         organization = "AICTE, Ministry of Education",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
@@ -346,16 +346,16 @@ object CuratedOpportunityCatalog {
 
     val NSP_SCHOLARSHIP = OpportunityEntity(
         id = "curated_nsp_scholarships",
-        title = "National Scholarship Portal 2026 - Central & State Post-Matric Scholarships",
-        description = "One-stop digital portal for Central and State government pre-matric and post-matric scholarships for SC, ST, OBC, minority, and meritorious students across India.",
+        title = "ৰাষ্ট্ৰীয় বৃত্তি পৰ্টেল ২০২৬ (National Scholarship Portal - NSP) - প্ৰি আৰু পোষ্ট-মেট্ৰিক চৰকাৰী বৃত্তি",
+        description = "ভাৰত চৰকাৰ আৰু ৰাজ্য চৰকাৰসমূহৰ সকলো প্ৰি-মেট্ৰিক আৰু পোষ্ট-মেট্ৰিক বৃত্তিৰ একক ডিজিটেল পৰ্টেল। অনুসূচীত জাতি, জনজাতি, অ'বিচি আৰু সংখ্যালঘু ছাত্ৰ-ছাত্ৰীলৈ ডিবিটি সাহাৰ্য।",
         category = OpportunityCategory.SCHOLARSHIP.name,
         region = OpportunityRegion.INDIA.name,
-        sourceName = "National Scholarship Portal (NSP)",
+        sourceName = "ৰাষ্ট্ৰীয় বৃত্তি পৰ্টেল (NSP), MeitY",
         sourceUrl = "https://scholarships.gov.in",
         sourceDomain = "scholarships.gov.in",
         publishedAt = "2026-10-01",
         deadline = "31/01/2027",
-        eligibility = "Students studying in Class 1 to Post-Graduation in recognized schools/colleges fulfilling specific central or state income criteria.",
+        eligibility = "স্বীকৃতিপ্ৰাপ্ত বিদ্যালয়, মহাবিদ্যালয় বা বিশ্ববিদ্যালয়ত অধ্যয়নৰত যোগ্য ছাত্ৰ-ছাত্ৰী।",
         organization = "Ministry of Electronics and Information Technology (MeitY)",
         sourceTier = SourceTier.TIER_1_OFFICIAL.name,
         verificationStatus = VerificationStatus.VERIFIED.name,
@@ -363,7 +363,7 @@ object CuratedOpportunityCatalog {
     )
 
     fun getAllCurated(): List<OpportunityEntity> {
-        return listOf(
+        val baseCurated = listOf(
             ORUNODOI_3,
             NIJUT_MOINA,
             CMAAA_2,
@@ -384,5 +384,7 @@ object CuratedOpportunityCatalog {
             AICTE_PRAGATI,
             NSP_SCHOLARSHIP
         )
+        val portalEntities = com.example.data.remote.scout.OfficialPortalDirectory.getAllAsOpportunityEntities()
+        return baseCurated + portalEntities
     }
 }

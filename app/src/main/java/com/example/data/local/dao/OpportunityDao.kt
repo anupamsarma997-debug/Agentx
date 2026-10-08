@@ -21,16 +21,16 @@ interface OpportunityDao {
     suspend fun updateOpportunity(opportunity: OpportunityEntity)
 
     @Query("SELECT * FROM opportunities ORDER BY discoveredAt DESC LIMIT :limit")
-    fun getLatestOpportunities(limit: Int = 100): Flow<List<OpportunityEntity>>
+    fun getLatestOpportunities(limit: Int = 500): Flow<List<OpportunityEntity>>
 
     @Query("SELECT * FROM opportunities WHERE verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
-    fun getActiveOpportunities(limit: Int = 150): Flow<List<OpportunityEntity>>
+    fun getActiveOpportunities(limit: Int = 500): Flow<List<OpportunityEntity>>
 
     @Query("SELECT * FROM opportunities WHERE category = :category AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
-    fun getOpportunitiesByCategory(category: String, limit: Int = 100): Flow<List<OpportunityEntity>>
+    fun getOpportunitiesByCategory(category: String, limit: Int = 500): Flow<List<OpportunityEntity>>
 
     @Query("SELECT * FROM opportunities WHERE region = :region AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
-    fun getOpportunitiesByRegion(region: String, limit: Int = 100): Flow<List<OpportunityEntity>>
+    fun getOpportunitiesByRegion(region: String, limit: Int = 500): Flow<List<OpportunityEntity>>
 
     @Query("UPDATE opportunities SET isExpired = 0, verificationStatus = 'VERIFIED' WHERE verificationStatus = 'EXPIRED' OR isExpired = 1")
     suspend fun unexpireAllOpportunities(): Int

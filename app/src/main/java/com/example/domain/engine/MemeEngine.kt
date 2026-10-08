@@ -104,8 +104,32 @@ class MemeEngine(
     )
 
     fun buildRelatableMemeFallback(topic: MemeTopic, format: MemeFormat): MemeDraft {
-        val tuple = when (format) {
-            MemeFormat.NEWSBOY_CREATOR_STYLE -> {
+        val topicLower = topic.topic.lowercase()
+        val isAssamContext = topicLower.contains("assam") || topicLower.contains("guwahati") ||
+            topicLower.contains("অসম") || topicLower.contains("আৰক্ষী") ||
+            format == MemeFormat.ASSAM_RELATABLE
+
+        val isHackathonContext = topicLower.contains("hackathon") || topicLower.contains("sih") ||
+            topicLower.contains("coding") || topicLower.contains("tech") || topicLower.contains("হেকাথন")
+
+        val tuple = when {
+            isAssamContext || format == MemeFormat.ASSAM_RELATABLE -> {
+                MemeTuple(
+                    setup = "গুৱাহাটীৰ জিএছ ৰোডৰ জাঁম বনাম সন্ধিয়াৰ বৰষুণৰ পিছৰ ৰঙা চাহ",
+                    punchline = "অসমৰ ৰাইজ: 'যিমানেই ট্ৰেফিক নহওক, সন্ধিয়া একাপ গৰম চাহ আৰু চিঙৰা লাগিবই!' ☕🌧️",
+                    caption = "অসমৰ প্ৰতিজন ব্যক্তিৰ চিৰপৰিচিত দৈনন্দিন অনুভূতি! 🌧️ ${topic.topic}\n\n#অসম #গুৱাহাটী #AssamLife #RelatableAssam #Axom #MemeAssam",
+                    hashtags = listOf("#অসম", "#গুৱাহাটী", "#AssamLife", "#AssamRelatable", "#Axom", "#MemeAssam")
+                )
+            }
+            isHackathonContext -> {
+                MemeTuple(
+                    setup = "Hackathon submission deadline: 11:59 PM vs Git Merge Conflict at 11:58 PM",
+                    punchline = "Team Lead: 'Bhai koi code push mat karna, main screen share karke direct viva dunga!' 💻🚀",
+                    caption = "Every 36-hour hackathon finale story! 💻 ${topic.topic}\n\n#Hackathon #CodingMemes #DeveloperLife #SmartIndia #SIH2026",
+                    hashtags = listOf("#Hackathon", "#CodingMemes", "#DevHumor", "#SmartIndia", "#SIH2026", "#TechLife")
+                )
+            }
+            format == MemeFormat.NEWSBOY_CREATOR_STYLE || topicLower.contains("newsboy") || topicLower.contains("creator") -> {
                 MemeTuple(
                     setup = "NewsBoy & Neon Man reporting creator news at 3 AM",
                     punchline = "Le audience: 'Bhai tum log soye kab the?' ⚡ Faster than 5G breaking updates!",
@@ -113,23 +137,23 @@ class MemeEngine(
                     hashtags = listOf("#NewsBoy", "#NeonMan", "#CreatorNews", "#YouTubeIndia", "#CreatorLife")
                 )
             }
-            MemeFormat.SARKARI_SCHEME_RELATABLE -> {
+            format == MemeFormat.SARKARI_SCHEME_RELATABLE || topicLower.contains("msme") || topicLower.contains("pmegp") || topicLower.contains("loan") || topicLower.contains("উদ্যোগ") -> {
                 MemeTuple(
-                    setup = "Looking for angel investors vs discovering Bharat Sarkar MSME PMEGP subsidy",
-                    punchline = "Direct project support with up to 35% margin subsidy. Entrepreneur journey unlocked! 🚀",
-                    caption = "Bharat Sarkar & MSME initiatives hit different when you actually check the portal! 🇮🇳\n\n${topic.topic}\n#MSME #BharatSarkar #StartupIndia",
-                    hashtags = listOf("#MSME", "#BharatSarkar", "#SarkariScheme", "#StartupIndia", "#YouthIndia")
+                    setup = "Finding out private bank rejected ₹5L loan vs Discovering PMEGP 35% subsidy for ₹50 Lakhs",
+                    punchline = "Bharat Sarkar MSME Portal: 'Swag se swagat hai aapka!' 🚀 Project report ready!",
+                    caption = "Bharat Sarkar & MSME initiatives hit different when you actually check the portal! 🏢 🇮🇳\n\n${topic.topic}\n#MSME #BharatSarkar #StartupIndia #PMEGP",
+                    hashtags = listOf("#MSME", "#BharatSarkar", "#SarkariScheme", "#StartupIndia", "#PMEGP", "#Subsidy")
                 )
             }
-            MemeFormat.JOB_RELATABLE -> {
+            format == MemeFormat.JOB_RELATABLE || topicLower.contains("job") || topicLower.contains("fresher") || topicLower.contains("police") || topicLower.contains("army") -> {
                 MemeTuple(
                     setup = "Fresher applying for entry level job: Needs 5 years experience",
                     punchline = "HR: 'Hamare yahan born with experience candidates chaiye!' 😂",
-                    caption = "The perpetual entry-level dilemma. Factual opportunity: ${topic.topic}\n#JobHunt #CareerHumor",
-                    hashtags = listOf("#JobHunt", "#FresherStruggles", "#CareerHumor", "#Resume")
+                    caption = "The perpetual entry-level dilemma. Factual opportunity: ${topic.topic}\n#JobHunt #CareerHumor #SLPRB",
+                    hashtags = listOf("#JobHunt", "#FresherStruggles", "#CareerHumor", "#Resume", "#GovtJobs")
                 )
             }
-            MemeFormat.STUDENT_RELATABLE -> {
+            format == MemeFormat.STUDENT_RELATABLE || topicLower.contains("exam") || topicLower.contains("college") -> {
                 MemeTuple(
                     setup = "Studying 1 night before the exam vs syllabus coverage",
                     punchline = "Page 1: Complete silence. Page 2: Ab Bhagwan hi bachaye! 📚",
@@ -137,7 +161,7 @@ class MemeEngine(
                     hashtags = listOf("#StudentLife", "#CollegeHumor", "#Exams", "#Relatable")
                 )
             }
-            MemeFormat.STARTUP_RELATABLE -> {
+            format == MemeFormat.STARTUP_RELATABLE || topicLower.contains("startup") -> {
                 MemeTuple(
                     setup = "Startup founder pitching deck: 'We are Uber for Chai'",
                     punchline = "Investor: 'Lekin chai to 10 rupaye ki hi rahegi na?' ☕",

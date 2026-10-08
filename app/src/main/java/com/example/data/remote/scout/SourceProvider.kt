@@ -660,3 +660,34 @@ class LiveGovernmentRssSourceProvider : SourceProvider {
         }
     }
 }
+
+/**
+ * 100+ Verified Official Portals Provider.
+ * Supplies 104 verified portals directly to OpportunityScoutEngine for factual social copy generation.
+ */
+class OfficialPortalDirectorySourceProvider : SourceProvider {
+    override val providerId: String = "official_portal_directory_100_websites"
+    override val providerName: String = "100+ Official Indian & Assam Government Portals"
+    override val sourceTier: SourceTier = SourceTier.TIER_1_OFFICIAL
+    override val defaultRegion: OpportunityRegion = OpportunityRegion.ASSAM
+
+    override suspend fun fetchItems(): List<OpportunityRawItem> = withContext(Dispatchers.IO) {
+        OfficialPortalDirectory.ALL_PORTALS.map { portal ->
+            val isAssam = portal.region == OpportunityRegion.ASSAM || portal.name.contains("Assam", ignoreCase = true) || portal.department.contains("Assam", ignoreCase = true)
+            val titlePrefix = if (isAssam) "অসম চৰকাৰৰ অফিচিয়েল পৰ্টেল" else "ভাৰত চৰকাৰৰ অফিচিয়েল পৰ্টেল"
+            OpportunityRawItem(
+                title = "$titlePrefix: ${portal.name} (${portal.badgeText})",
+                description = "${portal.description} এই অফিচিয়েল পৰ্টেলৰ জৰিয়তে পোনপটীয়াকৈ চৰকাৰী আঁচনি, নিযুক্তি আৰু অনলাইন সেৱাৰ সুবিধা গ্ৰহণ কৰক।",
+                sourceName = portal.department,
+                sourceUrl = portal.url,
+                publishedAt = "2026-10-01",
+                deadline = "31/12/2027",
+                eligibility = "অসম আৰু ভাৰতৰ যোগ্য নাগৰিক, শিক্ষার্থী আৰু যুৱক-যুৱতীসকল।",
+                organization = portal.department,
+                categoryHint = portal.category,
+                regionHint = portal.region
+            )
+        }
+    }
+}
+

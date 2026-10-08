@@ -7,6 +7,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.ui.screens.chat.ChatScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.generator.GeneratorScreen
 import com.example.ui.screens.opportunities.OpportunitiesScreen
@@ -95,6 +96,11 @@ fun AppNavHost(
                 onNavigateToQueue = {
                     navController.navigate(Screen.ContentQueue.route)
                 }
+            )
+        }
+        composable(route = Screen.Chat.route) {
+            ChatScreen(
+                viewModel = viewModel
             )
         }
         composable(route = Screen.Settings.route) {

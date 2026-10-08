@@ -1,7 +1,13 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.graphics.Bitmap
+import java.io.File
 import java.util.UUID
+import com.example.data.model.chat.ChatMessage
+import com.example.data.model.chat.ChatResult
+import com.example.data.model.chat.ChatModelOption
+import com.example.data.model.chat.ImageResult
 import com.example.domain.model.SourceFact
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -33,6 +39,7 @@ import com.example.data.model.meta.MetaConnectionState
 import com.example.data.model.meta.MetaConnectionStatus
 import com.example.data.model.opportunity.OpportunityCategory
 import com.example.data.model.opportunity.OpportunityRegion
+import com.example.data.model.opportunity.SourceTier
 import com.example.data.model.opportunity.VerificationStatus
 import com.example.data.remote.ai.GeminiClient
 import com.example.data.remote.meta.MetaOAuthConfig
@@ -51,6 +58,7 @@ import com.example.data.remote.scout.GovernmentJobsComprehensiveSourceProvider
 import com.example.data.remote.scout.ScholarshipsComprehensiveSourceProvider
 import com.example.data.remote.scout.InternshipsComprehensiveSourceProvider
 import com.example.data.remote.scout.OfficialPortalDirectory
+import com.example.data.remote.scout.OfficialPortalDirectorySourceProvider
 import com.example.data.repository.ContentRepository
 import com.example.data.repository.MetaConnectionRepository
 import com.example.data.repository.OpportunityRepository
@@ -119,6 +127,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val scoutEngine = OpportunityScoutEngine(
         dao = opportunityDao,
         providers = listOf(
+            OfficialPortalDirectorySourceProvider(),
             AssamGovernmentSchemesSourceProvider(),
             MsmeComprehensiveSourceProvider(),
             GovernmentJobsComprehensiveSourceProvider(),
@@ -322,6 +331,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _metaConfigDialogMessage = MutableStateFlow<String?>(null)
     val metaConfigDialogMessage: StateFlow<String?> = _metaConfigDialogMessage.asStateFlow()
 
+    // --- Gemini Multi-Turn Chat & Search Grounding ---
+    private val _chatMessages = MutableStateFlow<List<ChatMessage>>(
+        listOf(
+            ChatMessage(
+                role = "model",
+                text = "নমস্কাৰ! মই আপোনাৰ SocialAgent AI Copilot। অসম আৰু ভাৰতৰ সকলো চৰকাৰী আঁচনি, চাকৰি নিযুক্তি (SLPRB আৰক্ষী, সেনা), MSME ঋণ, হেকাথন, অথবা ছচিয়েল মিডিয়া কণ্টেণ্টৰ বিষয়ে যিকোনো প্ৰশ্ন সুধিব পাৰে। আপোনাক কিদৰে সহায় কৰিব পাৰোঁ?",
+                modelUsed = "gemini-3.5-flash"
+            )
+        )
+    )
+    val chatMessages: StateFlow<List<ChatMessage>> = _chatMessages.asStateFlow()
+
+    val isChatSending = MutableStateFlow(false)
+    val selectedChatModel = MutableStateFlow(ChatModelOption.GENERAL.modelId)
+    val isSearchGroundingEnabled = MutableStateFlow(true)
+
+    // --- Gemini AI Image Creation & Editing Studio (gemini-3.1-flash-image-preview) ---
+    val isGeneratingImage = MutableStateFlow(false)
+    val lastGeneratedImagePath = MutableStateFlow<String?>(null)
+    val lastImageDescription = MutableStateFlow<String?>(null)
+
     init {
         // Automatically restore saved Meta connection on startup
         metaConnectionRepository.restoreSavedConnection()
@@ -330,13 +360,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         // Auto-seed initial opportunities and ensure Assam schemes and defense jobs are present
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // Seed curated opportunities (Assam schemes, Police, Army, Navy, MSME, Hackathons, Startups, Scholarships)
-                val existingHashes = opportunityDao.getAllContentHashes().toSet()
-                val curatedToInsert = com.example.data.local.seed.CuratedOpportunityCatalog.getAllCurated()
-                    .filter { it.contentHash !in existingHashes }
-                if (curatedToInsert.isNotEmpty()) {
-                    opportunityDao.insertOpportunities(curatedToInsert)
-                }
+                // Seed curated opportunities (Assam schemes, Police, Army, Navy, MSME, Hackathons, Startups, Scholarships, and 100+ Official Portals)
+                val allCurated = com.example.data.local.seed.CuratedOpportunityCatalog.getAllCurated()
+                opportunityDao.insertOpportunities(allCurated)
             } catch (e: Exception) {
                 AppLogger.warn("Seed", "Opportunities", "Notice during curated opportunity seeding: ${e.localizedMessage}")
             }
@@ -528,6 +554,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val targetList: List<OpportunityEntity> = when (categoryFilter) {
+                    "MEMES" -> emptyList() // Handled specifically in dedicated meme generation block below
+                    "PORTALS" -> list.filter { item ->
+                        item.id.startsWith("portal_") || item.sourceTier == SourceTier.TIER_1_OFFICIAL.name
+                    }
                     "ASSAM_SCHEMES" -> list.filter { item ->
                         item.title.contains("Orunodoi", ignoreCase = true) ||
                         item.title.contains("অৰুণোদয়") ||
@@ -548,13 +578,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         item.title.contains("MSME", ignoreCase = true) ||
                         item.title.contains("PMEGP", ignoreCase = true) ||
                         item.title.contains("Udyam", ignoreCase = true) ||
+                        item.title.contains("উদ্যোগ") ||
                         item.title.contains("Vishwakarma", ignoreCase = true) ||
+                        item.title.contains("বিশ্বকৰ্মা") ||
                         item.title.contains("Subsidy", ignoreCase = true) ||
                         item.title.contains("Loan", ignoreCase = true)
                     }
                     "HACKATHONS" -> list.filter { item ->
                         item.category.contains("Hackathon", ignoreCase = true) ||
                         item.title.contains("Hackathon", ignoreCase = true) ||
+                        item.title.contains("হেকাথন") ||
                         item.title.contains("SIH", ignoreCase = true) ||
                         item.title.contains("Innovation Challenge", ignoreCase = true) ||
                         item.title.contains("Challenge", ignoreCase = true)
@@ -579,11 +612,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         item.title.contains("বৃত্তি")
                     }
                     else -> list
-                }.ifEmpty { list }
+                }.ifEmpty { if (categoryFilter == "MEMES") emptyList() else list }
 
                 val s = settings.value
+                val plannedQuota = if (categoryFilter == "MEMES") 5 else targetList.size + 15
                 settingsRepository.setDailyTargets(
-                    maxOf(s.dailyPostTarget + targetList.size + 15, s.todayPostCount + targetList.size + 15),
+                    maxOf(s.dailyPostTarget + plannedQuota, s.todayPostCount + plannedQuota),
                     s.dailyReelTarget
                 )
 
@@ -637,13 +671,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
-                // If generating ALL or MEMES, also generate curated relatable memes with all 4 sizes
+                // If generating ALL or MEMES, generate curated relatable memes with all 4 banner sizes
                 if (categoryFilter == "ALL" || categoryFilter == "MEMES") {
                     val memePresets = listOf(
+                        com.example.data.model.meme.MemeTopic.createAssamTheme(
+                            "গুৱাহাটীৰ জিএছ ৰোডৰ জাঁম বনাম সন্ধিয়াৰ বৰষুণৰ পিছৰ ৰঙা চাহ",
+                            "অসমৰ দৈনন্দিন চিৰপৰিচিত অনুভূতি আৰু সন্ধিয়াৰ চাহৰ আড্ডা"
+                        ) to com.example.data.model.meme.MemeFormat.ASSAM_RELATABLE,
                         com.example.data.model.meme.MemeTopic.createSarkariSchemeTheme(
                             "Bharat Sarkar MSME PMEGP vs Investor Pitch",
                             "Looking for angel investors vs discovering 35% margin subsidy and ₹50 Lakh collateral-free loan"
                         ) to com.example.data.model.meme.MemeFormat.SARKARI_SCHEME_RELATABLE,
+                        com.example.data.model.meme.MemeTopic.createGeneralTheme(
+                            "Hackathon Submission Deadline 11:59 PM vs Git Merge Conflict",
+                            "36-hour hackathon coding struggle and last-minute team viva"
+                        ) to com.example.data.model.meme.MemeFormat.TEXT_MEME,
                         com.example.data.model.meme.MemeTopic.createGeneralTheme(
                             "Fresher Applying For Job: Needs 5 Years Experience",
                             "HR requirement dilemma for entry level freshers"
@@ -2070,6 +2112,191 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (e is CancellationException) throw e
                 showMessage("Could not clear logs: ${e.message}")
             }
+        }
+    }
+
+    // --- Gemini Multi-Turn Chatbot & Search Grounding Actions ---
+    fun setChatModel(model: String) {
+        selectedChatModel.value = model
+    }
+
+    fun toggleSearchGrounding(enabled: Boolean) {
+        isSearchGroundingEnabled.value = enabled
+    }
+
+    fun clearChatHistory() {
+        _chatMessages.value = listOf(
+            ChatMessage(
+                role = "model",
+                text = "কথোপকথন ৰিছেট কৰা হ'ল। নতুন বিষয়ৰ ওপৰত কিবা সুধিব বিচাৰে নেকি?",
+                modelUsed = selectedChatModel.value
+            )
+        )
+    }
+
+    fun sendChatMessage(userText: String) {
+        if (userText.isBlank() || isChatSending.value) return
+        val userMsg = ChatMessage(role = "user", text = userText.trim())
+        val updatedList = _chatMessages.value + userMsg
+        _chatMessages.value = updatedList
+        isChatSending.value = true
+
+        viewModelScope.launch {
+            try {
+                val sysInstruction = """
+                    You are SocialAgent AI Copilot, a highly knowledgeable and helpful AI assistant for Assam and India.
+                    Expertise:
+                    1. Assam State Government Schemes (Orunodoi 3.0, Nijut Moina, CMAAA 2.0, Pragyan Bharati Scooty, Swanirbhar Nari, Arundhati Gold).
+                    2. Central Government Schemes & MSME Subsidies (PMEGP 35% margin subsidy, Udyam Zero Cost, PM Vishwakarma).
+                    3. Defense & Police recruitments (Assam Police SLPRB, Indian Army, Navy, Merchant Navy).
+                    4. Hackathons & Tech Challenges (Smart India Hackathon, MyGov Challenges, AICTE).
+                    5. Viral Social Media Content Creation, Memes, and Engagement Strategies.
+                    Communicate natively in Assamese, English, or Hinglish matching the user's preference. Be factual, concise, and helpful.
+                """.trimIndent()
+
+                val result = geminiClient.chatConversation(
+                    messages = updatedList,
+                    systemInstruction = sysInstruction,
+                    model = selectedChatModel.value,
+                    enableGoogleSearch = isSearchGroundingEnabled.value
+                )
+
+                when (result) {
+                    is ChatResult.Success -> {
+                        _chatMessages.value = _chatMessages.value + result.message
+                    }
+                    is ChatResult.Error -> {
+                        _chatMessages.value = _chatMessages.value + ChatMessage(
+                            role = "model",
+                            text = "Error: ${result.message}",
+                            isError = true
+                        )
+                    }
+                    is ChatResult.ConfigurationRequired -> {
+                        _chatMessages.value = _chatMessages.value + ChatMessage(
+                            role = "model",
+                            text = result.message,
+                            isError = true
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _chatMessages.value = _chatMessages.value + ChatMessage(
+                    role = "model",
+                    text = "Connection error: ${e.localizedMessage ?: "Unknown error"}",
+                    isError = true
+                )
+            } finally {
+                isChatSending.value = false
+            }
+        }
+    }
+
+    // --- Gemini AI Image Creation & Editing Studio (gemini-3.1-flash-image-preview) ---
+    fun generateImageWithPrompt(
+        prompt: String,
+        aspectRatio: String = "1:1",
+        onComplete: ((String?) -> Unit)? = null
+    ) {
+        if (prompt.isBlank() || isGeneratingImage.value) return
+        isGeneratingImage.value = true
+        viewModelScope.launch {
+            try {
+                val storageDir = File(getApplication<Application>().filesDir, "ai_generated_images")
+                val result = geminiClient.createImage(prompt, aspectRatio, storageDir)
+                when (result) {
+                    is ImageResult.Success -> {
+                        lastGeneratedImagePath.value = result.imagePath
+                        lastImageDescription.value = result.textDescription
+                        showMessage("AI Image generated successfully using gemini-3.1-flash-image-preview!")
+                        onComplete?.invoke(result.imagePath)
+                    }
+                    is ImageResult.Error -> {
+                        showMessage("Image generation failed: ${result.message}")
+                        onComplete?.invoke(null)
+                    }
+                    is ImageResult.ConfigurationRequired -> {
+                        showMessage(result.message)
+                        onComplete?.invoke(null)
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                showMessage("Image error: ${e.localizedMessage ?: "Unknown error"}")
+                onComplete?.invoke(null)
+            } finally {
+                isGeneratingImage.value = false
+            }
+        }
+    }
+
+    fun editImageWithPrompt(
+        prompt: String,
+        sourceBitmap: Bitmap,
+        aspectRatio: String = "1:1",
+        onComplete: ((String?) -> Unit)? = null
+    ) {
+        if (prompt.isBlank() || isGeneratingImage.value) return
+        isGeneratingImage.value = true
+        viewModelScope.launch {
+            try {
+                val storageDir = File(getApplication<Application>().filesDir, "ai_edited_images")
+                val result = geminiClient.editImage(prompt, sourceBitmap, aspectRatio, storageDir)
+                when (result) {
+                    is ImageResult.Success -> {
+                        lastGeneratedImagePath.value = result.imagePath
+                        lastImageDescription.value = result.textDescription
+                        showMessage("AI Image edited successfully using gemini-3.1-flash-image-preview!")
+                        onComplete?.invoke(result.imagePath)
+                    }
+                    is ImageResult.Error -> {
+                        showMessage("Image edit failed: ${result.message}")
+                        onComplete?.invoke(null)
+                    }
+                    is ImageResult.ConfigurationRequired -> {
+                        showMessage(result.message)
+                        onComplete?.invoke(null)
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                showMessage("Image edit error: ${e.localizedMessage ?: "Unknown error"}")
+                onComplete?.invoke(null)
+            } finally {
+                isGeneratingImage.value = false
+            }
+        }
+    }
+
+    fun saveAiImageToQueue(
+        imagePath: String,
+        title: String,
+        caption: String
+    ) {
+        viewModelScope.launch {
+            val contentId = UUID.randomUUID().toString()
+            val entity = ContentEntity(
+                id = contentId,
+                sourceOpportunityId = "ai_image_$contentId",
+                contentType = ContentType.OPPORTUNITY_POST.name,
+                platform = ContentPlatform.BOTH.name,
+                title = title.ifBlank { "🎨 AI Generated Visual Content" },
+                body = caption.ifBlank { "Created using gemini-3.1-flash-image-preview AI Image Studio." },
+                caption = caption,
+                hashtags = "#AIArt, #SocialAgent, #Gemini, #Assam, #India",
+                sourceUrl = "https://ai.google.dev",
+                sourceName = "Gemini 3.1 Flash Image AI Studio",
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis(),
+                generationStatus = GenerationStatus.GENERATED.name,
+                verificationStatus = VerificationStatus.VERIFIED.name,
+                aiModel = "gemini-3.1-flash-image-preview",
+                errorMessage = null,
+                imageUrl = imagePath
+            )
+            contentDao.insertContent(entity)
+            showMessage("ছবি আৰু পোষ্ট সফলভাৱে কন্টেন্ট কিউত যোগ কৰা হ'ল (Added to Queue)!")
         }
     }
 }

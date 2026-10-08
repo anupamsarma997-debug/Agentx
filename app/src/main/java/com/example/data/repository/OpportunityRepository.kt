@@ -21,19 +21,19 @@ class OpportunityRepository(
     val lastScoutResult: StateFlow<ScoutResult?> = _lastScoutResult.asStateFlow()
 
     fun getActiveOpportunities(): Flow<List<OpportunityEntity>> {
-        return dao.getActiveOpportunities(100)
+        return dao.getActiveOpportunities(500)
     }
 
     fun getAllOpportunities(): Flow<List<OpportunityEntity>> {
-        return dao.getLatestOpportunities(100)
+        return dao.getLatestOpportunities(500)
     }
 
     fun getOpportunitiesByCategory(category: OpportunityCategory): Flow<List<OpportunityEntity>> {
-        return dao.getOpportunitiesByCategory(category.name, 100)
+        return dao.getOpportunitiesByCategory(category.name, 500)
     }
 
     fun getOpportunitiesByRegion(region: OpportunityRegion): Flow<List<OpportunityEntity>> {
-        return dao.getOpportunitiesByRegion(region.name, 100)
+        return dao.getOpportunitiesByRegion(region.name, 500)
     }
 
     fun getOpportunityById(id: String): Flow<OpportunityEntity?> {

@@ -211,27 +211,36 @@ class ContentCreationEngine(
             is AIResult.ConfigurationRequired, is AIResult.Error -> {
                 val fallbackBody = if (isAssameseMode) {
                     buildString {
-                        append("📢 ").append(fact.title).append("\n\n")
-                        append("📌 পদ / আঁচনিৰ সবিশেষ (Details):\n").append(fact.description).append("\n\n")
+                        val headerIcon = when (contentType) {
+                            ContentType.HACKATHON_ALERT -> "💻 হেকাথন আৰু প্ৰযুক্তি প্ৰতিযোগিতা জাননী (Tech Innovation Alert)"
+                            ContentType.MSME_ALERT -> "🏢 উদ্যোগ ঋণ আৰু চৰকাৰী ৰাজসাহায্য (MSME Scheme Alert)"
+                            ContentType.JOB_ALERT -> "🛡️ চৰকাৰী নিযুক্তি জাননী (Government Job Recruitment)"
+                            ContentType.SCHOLARSHIP_ALERT -> "🎓 ছাত্ৰ-ছাত্ৰীৰ বাবে চৰকাৰী বৃত্তি (Scholarship Alert)"
+                            ContentType.STARTUP_ALERT -> "🚀 ষ্টাৰ্টআপ পুঁজি আৰু ইনকিউবেচন (Startup Funding Alert)"
+                            else -> "📢 চৰকাৰী আঁচনি আৰু অফিচিয়েল জাননী (Official Alert)"
+                        }
+                        append(headerIcon).append("\n\n")
+                        append("📌 ").append(fact.title).append("\n\n")
+                        append("📋 সবিশেষ বিৱৰণ (Details):\n").append(fact.description).append("\n\n")
                         if (!fact.eligibility.isNullOrBlank()) {
-                            append("🎯 কি কি যোগ্যতা লাগিব (Requirements / Eligibility):\n• ").append(fact.eligibility).append("\n\n")
+                            append("🎯 কি কি যোগ্যতা লাগিব (Eligibility & Requirements):\n• ").append(fact.eligibility).append("\n\n")
                         }
                         if (!fact.deadline.isNullOrBlank()) {
-                            append("⏰ আবেদনৰ অন্তিম তাৰিখ (Deadline): ").append(fact.deadline).append("\n\n")
+                            append("⏰ আবেদন / পঞ্জীয়নৰ অন্তিম তাৰিখ (Deadline): ").append(fact.deadline).append("\n\n")
                         }
                         if (!fact.organization.isNullOrBlank()) {
                             append("🏛️ সংগঠন / বিভাগ: ").append(fact.organization).append("\n\n")
                         }
-                        append("🔗 ক'ত আবেদন কৰিব (Where to Apply / Official Portal):\n")
-                        append("পোনে পোনে অফিচিয়েল ৱেবচাইটত আবেদন কৰক:\n👉 ").append(fact.sourceUrl).append("\n\n")
-                        append("⚠️ অনলাইন আবেদনৰ পূৰ্বে অফিচিয়েল জাননীখন ভালদৰে পঢ়ি লওক।")
+                        append("🔗 ক'ত আৰু কেনেকৈ আবেদন কৰিব (Where to Apply / Official Portal):\n")
+                        append("তলত দিয়া অফিচিয়েল পৰ্টেললৈ গৈ অনলাইন আবেদন কৰক:\n👉 ").append(fact.sourceUrl).append("\n\n")
+                        append("⚠️ অনলাইন আবেদনৰ পূৰ্বে অফিচিয়েল ৱেবচাইটত প্ৰকাশিত মূল জাননীখন ভালদৰে পঢ়ি লওক।")
                     }
                 } else {
                     buildString {
-                        append(fact.title).append("\n\n")
+                        append("📢 ").append(fact.title).append("\n\n")
                         append(fact.description).append("\n\n")
                         if (!fact.eligibility.isNullOrBlank()) {
-                            append("🎯 Eligibility & Requirements: ").append(fact.eligibility).append("\n\n")
+                            append("🎯 Eligibility & Requirements:\n• ").append(fact.eligibility).append("\n\n")
                         }
                         if (!fact.deadline.isNullOrBlank()) {
                             append("⏰ Deadline: ").append(fact.deadline).append("\n\n")

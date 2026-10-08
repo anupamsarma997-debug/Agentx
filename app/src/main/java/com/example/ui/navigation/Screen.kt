@@ -4,10 +4,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
@@ -35,18 +37,26 @@ sealed class Screen(
         navLabel = "Trends"
     )
 
-    data object ContentQueue : Screen(
-        route = "content_queue",
-        title = "Queue",
-        selectedIcon = Icons.Filled.Schedule,
-        unselectedIcon = Icons.Outlined.Schedule
-    )
-
     data object Generator : Screen(
         route = "generator",
         title = "Generator",
         selectedIcon = Icons.Filled.AutoAwesome,
         unselectedIcon = Icons.Outlined.AutoAwesome
+    )
+
+    data object Chat : Screen(
+        route = "chat",
+        title = "AI Chat",
+        selectedIcon = Icons.Filled.Chat,
+        unselectedIcon = Icons.Outlined.Chat,
+        navLabel = "AI Chat"
+    )
+
+    data object ContentQueue : Screen(
+        route = "content_queue",
+        title = "Queue",
+        selectedIcon = Icons.Filled.Schedule,
+        unselectedIcon = Icons.Outlined.Schedule
     )
 
     data object Settings : Screen(
@@ -101,8 +111,9 @@ sealed class Screen(
         val bottomNavItems = listOf(
             Dashboard,
             Opportunities,
-            ContentQueue,
             Generator,
+            Chat,
+            ContentQueue,
             Settings
         )
     }
