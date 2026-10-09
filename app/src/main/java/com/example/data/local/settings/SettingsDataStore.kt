@@ -25,7 +25,7 @@ data class AppSettings(
     val automationEndMinute: Int = 0,
     val timezone: String = "Asia/Kolkata",
     val dailyPostTarget: Int = 50,
-    val dailyReelTarget: Int = 10,
+    val dailyReelTarget: Int = 20,
     val todayPostCount: Int = 0,
     val todayReelCount: Int = 0,
     val lastCountDate: String = "",
@@ -33,7 +33,8 @@ data class AppSettings(
     val northeastPriority: Boolean = true,
     val indiaOpportunities: Boolean = true,
     val internationalOpportunities: Boolean = false,
-    val newsCollection: Boolean = true
+    val newsCollection: Boolean = true,
+    val customGeminiApiKey: String = ""
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -56,6 +57,7 @@ class SettingsDataStore(private val context: Context) {
         val KEY_INDIA_OPPORTUNITIES = booleanPreferencesKey("india_opportunities")
         val KEY_INTERNATIONAL_OPPORTUNITIES = booleanPreferencesKey("international_opportunities")
         val KEY_NEWS_COLLECTION = booleanPreferencesKey("news_collection")
+        val KEY_CUSTOM_GEMINI_API_KEY = stringPreferencesKey("custom_gemini_api_key")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -68,12 +70,17 @@ class SettingsDataStore(private val context: Context) {
         }
         .map { prefs ->
             val todayKey = try {
-                java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
-            } catch (_: Exception) {
+                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                sdf.format(java.util.Date())
+            } catch (_: Throwable) {
                 ""
             }
             val lastDate = prefs[KEY_LAST_COUNT_DATE] ?: ""
             val isSameDay = lastDate.isNotEmpty() && lastDate == todayKey
+            val postCount = if (isSameDay) (prefs[KEY_TODAY_POST_COUNT] ?: 0) else 0
+            val reelCount = if (isSameDay) (prefs[KEY_TODAY_REEL_COUNT] ?: 0) else 0
+            val postTarget = maxOf(prefs[KEY_DAILY_POST_TARGET] ?: 50, 50)
+            val reelTarget = maxOf(prefs[KEY_DAILY_REEL_TARGET] ?: 20, 20)
 
             AppSettings(
                 freeMode = prefs[KEY_FREE_MODE] ?: true,
@@ -83,16 +90,17 @@ class SettingsDataStore(private val context: Context) {
                 automationEndHour = prefs[KEY_AUTOMATION_END_HOUR] ?: 11,
                 automationEndMinute = prefs[KEY_AUTOMATION_END_MINUTE] ?: 0,
                 timezone = prefs[KEY_TIMEZONE] ?: "Asia/Kolkata",
-                dailyPostTarget = prefs[KEY_DAILY_POST_TARGET] ?: 50,
-                dailyReelTarget = prefs[KEY_DAILY_REEL_TARGET] ?: 10,
-                todayPostCount = if (isSameDay) (prefs[KEY_TODAY_POST_COUNT] ?: 0) else 0,
-                todayReelCount = if (isSameDay) (prefs[KEY_TODAY_REEL_COUNT] ?: 0) else 0,
+                dailyPostTarget = postTarget,
+                dailyReelTarget = reelTarget,
+                todayPostCount = postCount,
+                todayReelCount = reelCount,
                 lastCountDate = if (isSameDay) lastDate else todayKey,
                 assamPriority = prefs[KEY_ASSAM_PRIORITY] ?: true,
                 northeastPriority = prefs[KEY_NORTHEAST_PRIORITY] ?: true,
                 indiaOpportunities = prefs[KEY_INDIA_OPPORTUNITIES] ?: true,
                 internationalOpportunities = prefs[KEY_INTERNATIONAL_OPPORTUNITIES] ?: false,
-                newsCollection = prefs[KEY_NEWS_COLLECTION] ?: true
+                newsCollection = prefs[KEY_NEWS_COLLECTION] ?: true,
+                customGeminiApiKey = prefs[KEY_CUSTOM_GEMINI_API_KEY] ?: ""
             )
         }
 
@@ -190,6 +198,12 @@ class SettingsDataStore(private val context: Context) {
                 val current = prefs[KEY_TODAY_REEL_COUNT] ?: 0
                 prefs[KEY_TODAY_REEL_COUNT] = current + 1
             }
+        }
+    }
+
+    suspend fun updateCustomGeminiApiKey(key: String) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_CUSTOM_GEMINI_API_KEY] = key.trim()
         }
     }
 }

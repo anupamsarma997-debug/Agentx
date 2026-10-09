@@ -44,7 +44,16 @@ open class GeminiClient(
         const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
         val FALLBACK_MODELS = listOf("gemini-2.5-flash", "gemini-1.5-flash")
 
+        @Volatile
+        var customApiKey: String? = null
+
         fun resolveApiKey(): String {
+            // 0. Custom API key saved in app Settings
+            val custom = customApiKey?.trim()
+            if (!custom.isNullOrBlank() && !custom.startsWith("YOUR_") && custom != "MY_GEMINI_API_KEY") {
+                return custom
+            }
+
             // 1. Direct BuildConfig resolution from Secrets Gradle Plugin / buildConfigField
             val fromBuildConfig = try {
                 val field = BuildConfig::class.java.getField("GEMINI_API_KEY")
@@ -73,6 +82,44 @@ open class GeminiClient(
             }
 
             return ""
+        }
+
+        suspend fun testApiKeyConnection(keyToTest: String? = null): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+            val key = keyToTest?.trim()?.ifBlank { null } ?: resolveApiKey()
+            if (key.isBlank() || key == "MY_GEMINI_API_KEY" || key.startsWith("YOUR_")) {
+                return@withContext Pair(false, "API key is not configured or blank.")
+            }
+            try {
+                val testUrl = "$BASE_URL/gemini-2.5-flash:generateContent?key=$key"
+                val payload = JSONObject().apply {
+                    put("contents", JSONArray().put(JSONObject().apply {
+                        put("parts", JSONArray().put(JSONObject().put("text", "Ping")))
+                    }))
+                }
+                val conn = (URL(testUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                }
+                OutputStreamWriter(conn.outputStream).use { it.write(payload.toString()) }
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    Pair(true, "Connected successfully to Google Gemini 2.5 Flash!")
+                } else {
+                    val errStream = conn.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                    val errMsg = when {
+                        code == 400 && errStream.contains("API_KEY_INVALID") -> "Invalid API key."
+                        code in listOf(401, 403) -> "Unauthorized key. Check permissions in Google AI Studio."
+                        code == 429 -> "Rate limit reached (HTTP 429)."
+                        else -> "HTTP $code error. Response: ${errStream.take(100)}"
+                    }
+                    Pair(false, errMsg)
+                }
+            } catch (e: Exception) {
+                Pair(false, "Connection error: ${e.localizedMessage ?: "Network failed"}")
+            }
         }
     }
 

@@ -694,7 +694,7 @@ fun DashboardScreen(
                             color = MaterialTheme.colorScheme.secondaryContainer
                         ) {
                             Text(
-                                text = "${settings.todayPostCount} / ${settings.dailyPostTarget} POSTS",
+                                text = "${settings.todayPostCount} POSTS (FREE ACCESS)",
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
@@ -1071,18 +1071,43 @@ fun DashboardScreen(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Today's Target",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "Daily cap enforced by FreeTierGuard",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Daily Activity & Limits",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Unlimited Creation Mode Active • Unlimited Generation",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(
+                            onClick = { viewModel.resetTodayCounts() },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_dashboard_reset_quota")
+                        ) {
+                            Text("🔄 Reset 0", style = MaterialTheme.typography.labelSmall)
+                        }
+                        OutlinedButton(
+                            onClick = { viewModel.increaseDailyQuota(50) },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_dashboard_add_quota")
+                        ) {
+                            Text("➕ +50", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Posts Target
                 Row(

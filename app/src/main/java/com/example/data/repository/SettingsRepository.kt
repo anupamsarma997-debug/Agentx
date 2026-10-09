@@ -60,10 +60,15 @@ class SettingsRepository(private val settingsDataStore: SettingsDataStore) {
         settingsDataStore.checkAndResetDailyCounts(todayKey)
     }
 
+    suspend fun updateCustomGeminiApiKey(key: String) {
+        settingsDataStore.updateCustomGeminiApiKey(key)
+    }
+
     private fun getTodayDateKey(): String {
         return try {
-            LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-        } catch (_: Exception) {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            sdf.format(java.util.Date())
+        } catch (_: Throwable) {
             "today"
         }
     }

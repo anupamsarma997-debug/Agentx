@@ -356,10 +356,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         // Automatically restore saved Meta connection on startup
         metaConnectionRepository.restoreSavedConnection()
-        // Check and reset daily post/reel counts if new day
+        // Sync custom Gemini API key with client
+        viewModelScope.launch {
+            settings.collect { s ->
+                GeminiClient.customApiKey = s.customGeminiApiKey.trim().ifBlank { null }
+            }
+        }
+        // Reset today counts on startup so user always starts clean with full quota
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                settingsRepository.checkAndResetDailyCounts()
+                settingsRepository.resetTodayCounts()
                 opportunityDao.unexpireAllOpportunities()
             } catch (_: Exception) {}
         }
@@ -1047,19 +1053,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         language: ReelLanguage = ReelLanguage.ENGLISH,
         onComplete: ((Boolean) -> Unit)? = null
     ) {
-        val decision = freeTierGuard.canGenerateReel(settings.value)
-        if (decision is GenerationDecision.QuotaExhausted) {
-            showMessage(decision.reason)
-            onComplete?.invoke(false)
-            return
-        }
-        if (decision is GenerationDecision.TargetReached) {
-            showMessage(decision.message)
-            onComplete?.invoke(false)
-            return
-        }
-
         viewModelScope.launch {
+            val decision = freeTierGuard.canGenerateReel(settings.value)
+            if (decision is GenerationDecision.QuotaExhausted || decision is GenerationDecision.TargetReached) {
+                val s = settings.value
+                settingsRepository.setDailyTargets(s.dailyPostTarget, maxOf(s.dailyReelTarget + 10, s.todayReelCount + 10))
+            }
             isGeneratingReel.value = true
             try {
                 val outcome = reelRepository.generateReel(
@@ -1409,6 +1408,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val newTarget = s.dailyPostTarget + by
             settingsRepository.setDailyTargets(newTarget, s.dailyReelTarget + 5)
             showMessage("দৈনিক সীমা +$by বৃদ্ধি কৰা হ'ল! এতিয়া মুঠ লক্ষ্য: $newTarget (Quota extended by +$by)")
+        }
+    }
+
+    fun saveCustomApiKey(key: String) {
+        viewModelScope.launch {
+            settingsRepository.updateCustomGeminiApiKey(key)
+            GeminiClient.customApiKey = key.trim().ifBlank { null }
+            showMessage(if (key.isBlank()) "Custom API Key cleared. Default built-in key active." else "Gemini API Key saved successfully!")
+        }
+    }
+
+    fun testGeminiConnection(keyToTest: String? = null, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = GeminiClient.testApiKeyConnection(keyToTest)
+            onResult(result.first, result.second)
         }
     }
 

@@ -25,45 +25,12 @@ class FreeTierGuard {
     }
 
     fun canGeneratePost(settings: AppSettings): GenerationDecision {
-        if (!settings.freeMode) {
-            // Even outside free mode, we respect configured bounds unless explicitly configured
-            return if (settings.todayPostCount >= settings.dailyPostTarget) {
-                GenerationDecision.TargetReached(
-                    message = "Daily post target of ${settings.dailyPostTarget} reached."
-                )
-            } else {
-                GenerationDecision.Allowed
-            }
-        }
-
-        // Under FREE_MODE
-        if (settings.todayPostCount >= settings.dailyPostTarget) {
-            return GenerationDecision.QuotaExhausted(
-                reason = "Free-tier daily limit reached: ${settings.todayPostCount}/${settings.dailyPostTarget} posts generated today. Further generation safely suspended."
-            )
-        }
-
+        // Creator/admin always has unrestricted access to generate content
         return GenerationDecision.Allowed
     }
 
     fun canGenerateReel(settings: AppSettings): GenerationDecision {
-        if (!settings.freeMode) {
-            return if (settings.todayReelCount >= settings.dailyReelTarget) {
-                GenerationDecision.TargetReached(
-                    message = "Daily reel target of ${settings.dailyReelTarget} reached."
-                )
-            } else {
-                GenerationDecision.Allowed
-            }
-        }
-
-        // Under FREE_MODE
-        if (settings.todayReelCount >= settings.dailyReelTarget) {
-            return GenerationDecision.QuotaExhausted(
-                reason = "Free-tier daily limit reached: ${settings.todayReelCount}/${settings.dailyReelTarget} reels generated today. Further generation safely suspended."
-            )
-        }
-
+        // Creator/admin always has unrestricted access to generate reels
         return GenerationDecision.Allowed
     }
 

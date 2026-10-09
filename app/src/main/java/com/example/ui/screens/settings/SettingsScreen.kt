@@ -16,7 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PostAdd
@@ -24,20 +27,26 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -72,6 +81,11 @@ fun SettingsScreen(
     var showTargetDialog by remember { mutableStateOf(false) }
     var showTimezoneDialog by remember { mutableStateOf(false) }
 
+    var apiKeyInput by remember(settings.customGeminiApiKey) { mutableStateOf(settings.customGeminiApiKey) }
+    var isApiKeyVisible by remember { mutableStateOf(false) }
+    var isTestingConnection by remember { mutableStateOf(false) }
+    var connectionTestResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -85,10 +99,172 @@ fun SettingsScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Configure safe operating windows, authentication, and quotas.",
+            text = "Configure safe operating windows, authentication, AI keys, and quotas.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        // GOOGLE GEMINI AI ENGINE CONFIGURATION Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_gemini_api_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Key,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "GOOGLE GEMINI AI ENGINE",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (settings.customGeminiApiKey.isNotBlank()) Color(0xFFDCFCE7) else MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = if (settings.customGeminiApiKey.isNotBlank()) "Custom Key" else "Built-in / Standalone",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (settings.customGeminiApiKey.isNotBlank()) Color(0xFF166534) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "GitHub / Standalone APK Setup: If you installed this APK from GitHub and want to use your own Google Gemini AI quota, paste your Gemini API key below (get free key from aistudio.google.com).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = apiKeyInput,
+                    onValueChange = { apiKeyInput = it },
+                    label = { Text("Gemini API Key (AIzaSy...)") },
+                    placeholder = { Text("Enter or paste your GEMINI_API_KEY") },
+                    visualTransformation = if (isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { isApiKeyVisible = !isApiKeyVisible }) {
+                            Icon(
+                                imageVector = if (isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = if (isApiKeyVisible) "Hide key" else "Show key"
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_gemini_api_key"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.saveCustomApiKey(apiKeyInput.trim())
+                            connectionTestResult = null
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_save_gemini_api_key"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Save Key")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            isTestingConnection = true
+                            connectionTestResult = null
+                            viewModel.testGeminiConnection(apiKeyInput.trim().ifBlank { null }) { success, message ->
+                                isTestingConnection = false
+                                connectionTestResult = Pair(success, message)
+                            }
+                        },
+                        enabled = !isTestingConnection,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_test_gemini_api_key"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (isTestingConnection) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Testing...")
+                        } else {
+                            Text("Test AI")
+                        }
+                    }
+
+                    if (settings.customGeminiApiKey.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = {
+                                apiKeyInput = ""
+                                viewModel.saveCustomApiKey("")
+                                connectionTestResult = null
+                            },
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("Clear")
+                        }
+                    }
+                }
+
+                if (connectionTestResult != null) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    val (isSuccess, resultMsg) = connectionTestResult!!
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSuccess) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                                contentDescription = null,
+                                tint = if (isSuccess) Color(0xFF166534) else Color(0xFF991B1B),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = resultMsg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isSuccess) Color(0xFF166534) else Color(0xFF991B1B),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // GOOGLE ACCOUNT & AUTHENTICATION Section
         Card(

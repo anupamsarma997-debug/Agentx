@@ -209,7 +209,7 @@ fun GeneratorScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Daily Quota: ${settings.todayPostCount} / ${settings.dailyPostTarget} used",
+                            text = "Daily Quota: ${settings.todayPostCount} used • Unlimited Access Active",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -228,58 +228,6 @@ fun GeneratorScreen(
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            modifier = Modifier
-                                .clickable { viewModel.increaseDailyQuota(20) }
-                                .testTag("btn_extend_quota_generator")
-                        ) {
-                            Text(
-                                text = "➕ +20 Limit",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-                }
-
-                if (settings.todayPostCount >= settings.dailyPostTarget) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "⚠️ দৈনিক সীমা (${settings.todayPostCount}/${settings.dailyPostTarget}) শেষ হৈছে",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                Text(
-                                    text = "কোনো চিন্তা নাই! নতুন পোষ্ট বনাবলৈ কাষৰ 'ৰিছেট' বুটাম ক্লিক কৰক।",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                            Button(
-                                onClick = { viewModel.resetTodayCounts() },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("ৰিছেট (Reset)", style = MaterialTheme.typography.labelSmall)
-                            }
                         }
                     }
                 }
