@@ -55,6 +55,11 @@ class SettingsRepository(private val settingsDataStore: SettingsDataStore) {
         settingsDataStore.resetCounts(todayKey)
     }
 
+    suspend fun checkAndResetDailyCounts() {
+        val todayKey = getTodayDateKey()
+        settingsDataStore.checkAndResetDailyCounts(todayKey)
+    }
+
     private fun getTodayDateKey(): String {
         return try {
             LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)

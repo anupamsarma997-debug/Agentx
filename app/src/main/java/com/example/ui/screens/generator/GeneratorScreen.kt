@@ -18,13 +18,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SentimentVerySatisfied
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -32,6 +35,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -69,6 +73,7 @@ import com.example.data.remote.scout.OfficialPortalDirectory
 import com.example.data.remote.scout.OfficialPortalInfo
 import com.example.domain.generator.PostImageSize
 import com.example.ui.screens.opportunities.VerificationBadge
+import com.example.ui.screens.opportunities.AddOpportunityDialog
 import com.example.ui.viewmodel.AppViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -103,6 +108,35 @@ fun GeneratorScreen(
     var websiteSearchQuery by remember { mutableStateOf("") }
     var selectedWebsiteCategory by remember { mutableStateOf("ALL") }
     var showAllWebsites by remember { mutableStateOf(false) }
+    var showAddOpportunityDialog by remember { mutableStateOf(false) }
+
+    if (showAddOpportunityDialog) {
+        AddOpportunityDialog(
+            onDismiss = { showAddOpportunityDialog = false },
+            onSaveOpportunity = { title, desc, cat, reg, org, elig, url, dead ->
+                viewModel.addCustomOpportunity(
+                    title = title,
+                    description = desc,
+                    category = cat,
+                    region = reg,
+                    organization = org,
+                    eligibility = elig,
+                    sourceUrl = url,
+                    deadline = dead,
+                    onComplete = { entity ->
+                        selectedOpportunity = entity
+                        selectedContentType = when (entity.category) {
+                            OpportunityCategory.MSME.name -> ContentType.MSME_ALERT
+                            OpportunityCategory.GOVERNMENT_JOB.name, OpportunityCategory.JOB.name -> ContentType.JOB_ALERT
+                            OpportunityCategory.HACKATHON.name -> ContentType.HACKATHON_ALERT
+                            OpportunityCategory.SCHOLARSHIP.name -> ContentType.SCHOLARSHIP_ALERT
+                            else -> ContentType.OPPORTUNITY_POST
+                        }
+                    }
+                )
+            }
+        )
+    }
 
     // Auto-select initial verified opportunity if none selected
     if (selectedOpportunity == null) {
@@ -167,15 +201,87 @@ fun GeneratorScreen(
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                 ) {
-                    Text(
-                        text = "Daily Post Quota: ${settings.todayPostCount} / ${settings.dailyPostTarget} used",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Daily Quota: ${settings.todayPostCount} / ${settings.dailyPostTarget} used",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .clickable { viewModel.resetTodayCounts() }
+                                .testTag("btn_reset_quota_generator")
+                        ) {
+                            Text(
+                                text = "🔄 Reset to 0",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier
+                                .clickable { viewModel.increaseDailyQuota(20) }
+                                .testTag("btn_extend_quota_generator")
+                        ) {
+                            Text(
+                                text = "➕ +20 Limit",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+
+                if (settings.todayPostCount >= settings.dailyPostTarget) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "⚠️ দৈনিক সীমা (${settings.todayPostCount}/${settings.dailyPostTarget}) শেষ হৈছে",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Text(
+                                    text = "কোনো চিন্তা নাই! নতুন পোষ্ট বনাবলৈ কাষৰ 'ৰিছেট' বুটাম ক্লিক কৰক।",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            Button(
+                                onClick = { viewModel.resetTodayCounts() },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("ৰিছেট (Reset)", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -372,17 +478,35 @@ fun GeneratorScreen(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "CREATE CONTENT",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Choose an opportunity source, format, length, and destination platform.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "CREATE CONTENT",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Choose an opportunity source, format, length, and destination platform.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = { showAddOpportunityDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.testTag("btn_generator_add_new_opp")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("+ ADD NEW", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 

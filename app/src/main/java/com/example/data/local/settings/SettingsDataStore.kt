@@ -24,8 +24,8 @@ data class AppSettings(
     val automationEndHour: Int = 11,
     val automationEndMinute: Int = 0,
     val timezone: String = "Asia/Kolkata",
-    val dailyPostTarget: Int = 8,
-    val dailyReelTarget: Int = 2,
+    val dailyPostTarget: Int = 50,
+    val dailyReelTarget: Int = 10,
     val todayPostCount: Int = 0,
     val todayReelCount: Int = 0,
     val lastCountDate: String = "",
@@ -67,6 +67,14 @@ class SettingsDataStore(private val context: Context) {
             }
         }
         .map { prefs ->
+            val todayKey = try {
+                java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+            } catch (_: Exception) {
+                ""
+            }
+            val lastDate = prefs[KEY_LAST_COUNT_DATE] ?: ""
+            val isSameDay = lastDate.isNotEmpty() && lastDate == todayKey
+
             AppSettings(
                 freeMode = prefs[KEY_FREE_MODE] ?: true,
                 automationEnabled = prefs[KEY_AUTOMATION_ENABLED] ?: true,
@@ -75,11 +83,11 @@ class SettingsDataStore(private val context: Context) {
                 automationEndHour = prefs[KEY_AUTOMATION_END_HOUR] ?: 11,
                 automationEndMinute = prefs[KEY_AUTOMATION_END_MINUTE] ?: 0,
                 timezone = prefs[KEY_TIMEZONE] ?: "Asia/Kolkata",
-                dailyPostTarget = prefs[KEY_DAILY_POST_TARGET] ?: 8,
-                dailyReelTarget = prefs[KEY_DAILY_REEL_TARGET] ?: 2,
-                todayPostCount = prefs[KEY_TODAY_POST_COUNT] ?: 0,
-                todayReelCount = prefs[KEY_TODAY_REEL_COUNT] ?: 0,
-                lastCountDate = prefs[KEY_LAST_COUNT_DATE] ?: "",
+                dailyPostTarget = prefs[KEY_DAILY_POST_TARGET] ?: 50,
+                dailyReelTarget = prefs[KEY_DAILY_REEL_TARGET] ?: 10,
+                todayPostCount = if (isSameDay) (prefs[KEY_TODAY_POST_COUNT] ?: 0) else 0,
+                todayReelCount = if (isSameDay) (prefs[KEY_TODAY_REEL_COUNT] ?: 0) else 0,
+                lastCountDate = if (isSameDay) lastDate else todayKey,
                 assamPriority = prefs[KEY_ASSAM_PRIORITY] ?: true,
                 northeastPriority = prefs[KEY_NORTHEAST_PRIORITY] ?: true,
                 indiaOpportunities = prefs[KEY_INDIA_OPPORTUNITIES] ?: true,
@@ -143,6 +151,17 @@ class SettingsDataStore(private val context: Context) {
             prefs[KEY_TODAY_POST_COUNT] = 0
             prefs[KEY_TODAY_REEL_COUNT] = 0
             prefs[KEY_LAST_COUNT_DATE] = dateKey
+        }
+    }
+
+    suspend fun checkAndResetDailyCounts(dateKey: String) {
+        context.dataStore.edit { prefs ->
+            val currentDate = prefs[KEY_LAST_COUNT_DATE] ?: ""
+            if (currentDate != dateKey) {
+                prefs[KEY_LAST_COUNT_DATE] = dateKey
+                prefs[KEY_TODAY_POST_COUNT] = 0
+                prefs[KEY_TODAY_REEL_COUNT] = 0
+            }
         }
     }
 

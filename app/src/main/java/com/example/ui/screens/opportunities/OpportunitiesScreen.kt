@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.FilterList
@@ -36,6 +37,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -76,9 +78,28 @@ fun OpportunitiesScreen(
     val selectedRegion by viewModel.selectedRegionFilter.collectAsState()
     val lastScoutResult by viewModel.lastScoutResult.collectAsState()
     var showPortalsDialog by remember { mutableStateOf(false) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
     if (showPortalsDialog) {
         OfficialPortalsDialog(onDismiss = { showPortalsDialog = false })
+    }
+
+    if (showAddDialog) {
+        AddOpportunityDialog(
+            onDismiss = { showAddDialog = false },
+            onSaveOpportunity = { title, desc, cat, reg, org, elig, url, dead ->
+                viewModel.addCustomOpportunity(
+                    title = title,
+                    description = desc,
+                    category = cat,
+                    region = reg,
+                    organization = org,
+                    eligibility = elig,
+                    sourceUrl = url,
+                    deadline = dead
+                )
+            }
+        )
     }
 
     Column(
@@ -86,7 +107,7 @@ fun OpportunitiesScreen(
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // Top Header with [ 60+ OFFICIAL WEBSITES ] and [ SCAN NOW ] Action
+        // Top Header with [ + ADD ], [ 60+ WEBSITES ], and [ SCAN NOW ] Action
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -108,7 +129,26 @@ fun OpportunitiesScreen(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                FilledTonalButton(
+                    onClick = { showAddDialog = true },
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("btn_add_opportunity")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "+ ADD",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
                 OutlinedButton(
                     onClick = { showPortalsDialog = true },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
@@ -122,7 +162,7 @@ fun OpportunitiesScreen(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "60+ WEBSITES",
+                        text = "PORTALS",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )

@@ -29,6 +29,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.data.model.content.ContentLength
 import com.example.data.model.content.ContentPlatform
 import com.example.data.model.content.ContentType
@@ -355,6 +356,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         // Automatically restore saved Meta connection on startup
         metaConnectionRepository.restoreSavedConnection()
+        // Check and reset daily post/reel counts if new day
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                settingsRepository.checkAndResetDailyCounts()
+                opportunityDao.unexpireAllOpportunities()
+            } catch (_: Exception) {}
+        }
         // Start background automation scheduler
         startAutomationScheduler()
         // Auto-seed initial opportunities and ensure Assam schemes and defense jobs are present
@@ -1391,6 +1399,64 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun resetTodayCounts() {
         viewModelScope.launch {
             settingsRepository.resetTodayCounts()
+            showMessage("দৈনিক লিমিট ৰিছেট কৰা হ'ল! আপুনি এতিয়া নতুন পোষ্ট বনাওক। (Daily limit reset to 0!)")
+        }
+    }
+
+    fun increaseDailyQuota(by: Int = 20) {
+        viewModelScope.launch {
+            val s = settings.value
+            val newTarget = s.dailyPostTarget + by
+            settingsRepository.setDailyTargets(newTarget, s.dailyReelTarget + 5)
+            showMessage("দৈনিক সীমা +$by বৃদ্ধি কৰা হ'ল! এতিয়া মুঠ লক্ষ্য: $newTarget (Quota extended by +$by)")
+        }
+    }
+
+    fun addCustomOpportunity(
+        title: String,
+        description: String,
+        category: String,
+        region: String = "ASSAM",
+        organization: String = "Govt of Assam",
+        eligibility: String = "",
+        sourceUrl: String = "",
+        deadline: String = "31/12/2026",
+        onComplete: ((OpportunityEntity) -> Unit)? = null
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val cleanTitle = title.trim()
+                val id = "custom_" + System.currentTimeMillis() + "_" + cleanTitle.take(15).lowercase().replace(Regex("[^a-z0-9]"), "_")
+                val hash = "hash_custom_" + System.currentTimeMillis()
+                val entity = OpportunityEntity(
+                    id = id,
+                    title = cleanTitle,
+                    description = description.ifBlank { "নতুন যোগ কৰা চৰকাৰী সুযোগ আৰু নিযুক্তি।" },
+                    category = category,
+                    region = region,
+                    sourceName = organization.ifBlank { "Official Notification" },
+                    sourceUrl = sourceUrl.ifBlank { "https://assam.gov.in" },
+                    sourceDomain = if (sourceUrl.isNotBlank()) {
+                        try { java.net.URI(sourceUrl).host ?: "assam.gov.in" } catch (_: Exception) { "assam.gov.in" }
+                    } else "assam.gov.in",
+                    publishedAt = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()),
+                    deadline = deadline.ifBlank { "31/12/2026" },
+                    eligibility = eligibility.ifBlank { "সকলো যোগ্য প্ৰাৰ্থীয়ে আবেদন কৰিব পাৰিব।" },
+                    organization = organization.ifBlank { "Government Department" },
+                    sourceTier = SourceTier.TIER_1_OFFICIAL.name,
+                    verificationStatus = VerificationStatus.VERIFIED.name,
+                    contentHash = hash
+                )
+                opportunityDao.insertOpportunity(entity)
+                withContext(Dispatchers.Main) {
+                    showMessage("নতুন সুযোগ সফলতাৰে যোগ কৰা হ'ল: \"$cleanTitle\"")
+                    onComplete?.invoke(entity)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    showMessage("যোগ কৰোঁতে ত্ৰুটি হ'ল: ${e.localizedMessage}")
+                }
+            }
         }
     }
 
