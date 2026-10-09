@@ -50,6 +50,9 @@ fun AppNavHost(
                 viewModel = viewModel,
                 onNavigateToDetail = { id ->
                     navController.navigate(Screen.OpportunityDetail.createRoute(id))
+                },
+                onNavigateToGenerator = { oppId ->
+                    navController.navigate(Screen.Generator.route)
                 }
             )
         }

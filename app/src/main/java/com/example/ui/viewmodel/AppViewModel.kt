@@ -109,9 +109,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+enum class OpportunityPostFilter(val displayName: String) {
+    ALL("All (সকলো)"),
+    FRESH_48H_SARKARI("🔥 সৰকাৰী (48 Hours)"),
+    UNPOSTED_ONLY("✨ পোষ্ট নকৰা"),
+    POSTED_ONLY("✓ ইতিমধ্যে পোষ্ট কৰা")
+}
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -148,7 +156,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val postImageGenerator = PostImageGenerator(application.applicationContext)
     val geminiClient = GeminiClient()
     val contentCreationEngine = ContentCreationEngine(geminiClient)
-    val contentRepository = ContentRepository(contentDao, contentCreationEngine, postImageGenerator)
+    val contentRepository = ContentRepository(contentDao, contentCreationEngine, postImageGenerator, opportunityDao)
 
     // Meme Engine (Phase 6)
     val memeDao = database.memeDao()
@@ -290,6 +298,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Opportunities state & filters
     val selectedCategoryFilter = MutableStateFlow<OpportunityCategory?>(null)
     val selectedRegionFilter = MutableStateFlow<OpportunityRegion?>(null)
+    val selectedPostStatusFilter = MutableStateFlow(OpportunityPostFilter.ALL)
     val isScanning = MutableStateFlow(false)
 
     val allOpportunities: StateFlow<List<OpportunityEntity>> = opportunityRepository.getActiveOpportunities()
@@ -299,21 +308,41 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+    val postedOpportunityIds: StateFlow<Set<String>> = contentDao.getAllGeneratedOpportunityIds()
+        .map { it.toSet() }
+        .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptySet())
+
     val filteredOpportunities: StateFlow<List<OpportunityEntity>> = combine(
         allOpportunities,
         selectedCategoryFilter,
-        selectedRegionFilter
-    ) { list, category, region ->
+        selectedRegionFilter,
+        selectedPostStatusFilter,
+        postedOpportunityIds
+    ) { list, category, region, postFilter, postedIds ->
         list.filter { item ->
             val matchCategory = category == null || item.category == category.name
             val matchRegion = region == null || item.region == region.name
-            matchCategory && matchRegion
+            val isPosted = item.isPosted || postedIds.contains(item.id)
+            val matchPost = when (postFilter) {
+                OpportunityPostFilter.ALL -> true
+                OpportunityPostFilter.FRESH_48H_SARKARI -> item.isFresh48Hours() && item.isSarkariUpdate()
+                OpportunityPostFilter.UNPOSTED_ONLY -> !isPosted
+                OpportunityPostFilter.POSTED_ONLY -> isPosted
+            }
+            matchCategory && matchRegion && matchPost
         }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
+
+    val freshSarkari48hList: StateFlow<List<OpportunityEntity>> = allOpportunities.map { list ->
+        list.filter { it.isFresh48Hours() && it.isSarkariUpdate() && !it.isPosted }
+    }.stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptyList())
+
+    val freshSarkari48hCount: StateFlow<Int> = freshSarkari48hList.map { it.size }
+        .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = 0)
 
     val totalCount: StateFlow<Int> = opportunityRepository.countTotal()
         .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = 0)
@@ -325,6 +354,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = 0)
 
     val lastScoutResult: StateFlow<ScoutResult?> = opportunityRepository.lastScoutResult
+
+    val unpostedOpportunities: StateFlow<List<OpportunityEntity>> = opportunityDao.getUnpostedOpportunities()
+        .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = emptyList())
+
+    val fresh48hCount: StateFlow<Int> = opportunityDao.countFresh48Hours(System.currentTimeMillis() - 48L * 3600 * 1000)
+        .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = 0)
+
+    val postedCount: StateFlow<Int> = opportunityDao.countPosted()
+        .stateIn(scope = viewModelScope, started = SharingStarted.WhileSubscribed(5000), initialValue = 0)
 
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
@@ -374,9 +412,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         // Auto-seed initial opportunities and ensure Assam schemes and defense jobs are present
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Ensure all existing generated post opportunities are permanently marked isPosted = true
+                val existingGeneratedIds = contentDao.getAllGeneratedOpportunityIdsSync()
+                if (existingGeneratedIds.isNotEmpty()) {
+                    opportunityDao.markMultipleAsPosted(existingGeneratedIds)
+                }
                 // Seed curated opportunities (Assam schemes, Police, Army, Navy, MSME, Hackathons, Startups, Scholarships, and 100+ Official Portals)
+                // Preserving posted status so previously generated items never lose their isPosted = true state!
                 val allCurated = com.example.data.local.seed.CuratedOpportunityCatalog.getAllCurated()
-                opportunityDao.insertOpportunities(allCurated)
+                opportunityDao.upsertPreservingPostedStatus(allCurated)
             } catch (e: Exception) {
                 AppLogger.warn("Seed", "Opportunities", "Notice during curated opportunity seeding: ${e.localizedMessage}")
             }
@@ -396,6 +440,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // Always ensure Assam Government Schemes and Police/Army/Navy posts are seeded in queue with images
                 com.example.data.local.seed.AssamAndDefenseSeedPosts.seedPosts(contentDao, postImageGenerator)
+                val finalPostedIds = contentDao.getAllGeneratedOpportunityIdsSync()
+                if (finalPostedIds.isNotEmpty()) {
+                    opportunityDao.markMultipleAsPosted(finalPostedIds)
+                }
             } catch (e: Exception) {
                 AppLogger.warn("Seed", "Posts", "Notice during post seeding: ${e.localizedMessage}")
             }
@@ -460,6 +508,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         selectedRegionFilter.value = region
     }
 
+    fun setPostStatusFilter(filter: OpportunityPostFilter) {
+        selectedPostStatusFilter.value = filter
+    }
+
     fun updateOpportunityVerification(id: String, status: VerificationStatus) {
         viewModelScope.launch {
             opportunityRepository.updateVerification(id, status)
@@ -481,6 +533,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         val s = settings.value
         viewModelScope.launch {
+            // Anti-duplication check: Avoid generating multiple posts for the same opportunity
+            val alreadyGenerated = contentDao.hasContentForOpportunity(opportunity.id)
+            if (alreadyGenerated || opportunity.isPosted) {
+                showMessage("⚠️ এই সুযোগৰ বাবে ইতিমধ্যে পোষ্ট প্ৰস্তুত কৰা হৈছে! একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয়। (Post already created for this opportunity! Duplicate generation prevented.)")
+                onComplete?.invoke(false)
+                return@launch
+            }
+
             val decision = freeTierGuard.canGeneratePost(s)
             if (decision is GenerationDecision.QuotaExhausted) {
                 // Auto-extend daily quota for explicit user action so generation is never blocked
@@ -505,6 +565,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 when (outcome) {
                     is ContentCreationOutcome.Success -> {
                         settingsRepository.incrementTodayPostCount()
+                        try {
+                            opportunityDao.markAsPosted(opportunity.id)
+                        } catch (_: Exception) {}
                         val statusText = if (outcome.initialStatus == GenerationStatus.REVIEW_REQUIRED) {
                             "Draft created in REVIEW REQUIRED (needs manual approval)."
                         } else {
@@ -625,20 +688,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         item.title.contains("Pragati", ignoreCase = true) ||
                         item.title.contains("বৃত্তি")
                     }
+                    "SARKARI_48H" -> list.filter { item ->
+                        item.isSarkariUpdate() && item.isFresh48Hours()
+                    }
                     else -> list
                 }.ifEmpty { if (categoryFilter == "MEMES") emptyList() else list }
 
+                // Strict Anti-Duplication: Do not re-generate opportunities that already have a post
+                val existingGeneratedIds = contentDao.getAllContentSync().map { it.sourceOpportunityId }.toSet()
+                val unpostedTargetList = targetList.filter { opp ->
+                    !opp.isPosted && opp.id !in existingGeneratedIds
+                }
+
+                if (unpostedTargetList.isEmpty() && categoryFilter != "MEMES") {
+                    batchProgressText.value = "সকলো পোষ্ট ইতিমধ্যে বনোৱা হৈছে"
+                    showMessage("এই শ্ৰেণীৰ সকলো সুযোগৰ পোষ্ট ইতিমধ্যে তৈয়াৰ কৰা হৈছে! একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয়। (All selected opportunities already have posts! No duplicates generated.)")
+                    isBatchGenerating.value = false
+                    onComplete?.invoke(0)
+                    return@launch
+                }
+
                 val s = settings.value
-                val plannedQuota = if (categoryFilter == "MEMES") 5 else targetList.size + 15
+                val plannedQuota = if (categoryFilter == "MEMES") 5 else unpostedTargetList.size + 15
                 settingsRepository.setDailyTargets(
                     maxOf(s.dailyPostTarget + plannedQuota, s.todayPostCount + plannedQuota),
                     s.dailyReelTarget
                 )
 
                 var successCount = 0
-                val total = targetList.size
+                val total = unpostedTargetList.size
 
-                for ((index, opp) in targetList.withIndex()) {
+                for ((index, opp) in unpostedTargetList.withIndex()) {
                     batchProgressRatio.value = ((index + 1).toFloat() / total.toFloat()).coerceIn(0.05f, 0.98f)
                     batchProgressText.value = "প্ৰস্তুত হৈ আছে (${index + 1}/$total): ${opp.title}"
 
@@ -678,6 +758,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         )
                         if (outcome is ContentCreationOutcome.Success) {
                             settingsRepository.incrementTodayPostCount()
+                            try {
+                                opportunityDao.markAsPosted(opp.id)
+                            } catch (_: Exception) {}
                             successCount++
                         }
                     } catch (e: Exception) {
@@ -1402,6 +1485,33 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Daily automatic scout refresh: Scans official government websites and updates today's notices.
+     * Enforces that fresh 48-hour government updates are prioritized and timestamped.
+     */
+    fun refreshDailySarkariUpdates(onComplete: ((Int) -> Unit)? = null) {
+        viewModelScope.launch {
+            try {
+                showMessage("আজিৰ নতুন চৰকাৰী জাননীসমূহ স্কেন কৰা হৈছে... (Scanning today's government updates...)")
+                val s = settings.value
+                val result = opportunityRepository.runScoutScan(
+                    assamEnabled = s.assamPriority,
+                    northeastEnabled = s.northeastPriority,
+                    indiaEnabled = s.indiaOpportunities,
+                    internationalEnabled = s.internationalOpportunities,
+                    newsEnabled = s.newsCollection
+                )
+                opportunityDao.unexpireAllOpportunities()
+                val freshCount = opportunityDao.getFreshOpportunities48Hours(System.currentTimeMillis() - 48L * 3600 * 1000, 100)
+                showMessage("✅ দৈনিক চৰকাৰী আপডেট সম্পূৰ্ণ! (${result.newItems} নতুন জাননী, মুঠ ৪৮ ঘণ্টাৰ সতেজ জাননী পোৱা গ'ল)")
+                onComplete?.invoke(result.newItems)
+            } catch (e: Exception) {
+                showMessage("স্কেন ব্যৰ্থ: ${e.localizedMessage}")
+                onComplete?.invoke(0)
+            }
+        }
+    }
+
     fun increaseDailyQuota(by: Int = 20) {
         viewModelScope.launch {
             val s = settings.value
@@ -1556,7 +1666,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val existingIds = contentDao.getAllContentSync().map { it.sourceOpportunityId }.toSet()
-                val targetOps = verifiedOpportunities.filter { it.id !in existingIds }.take(3)
+                val targetOps = verifiedOpportunities.filter { !it.isPosted && it.id !in existingIds }.take(3)
 
                 for (op in targetOps) {
                     try {
@@ -1595,6 +1705,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                     imageUrl = postBanner
                                 )
                             )
+                            try {
+                                opportunityDao.markAsPosted(op.id)
+                            } catch (_: Exception) {}
                             postsGenerated++
                         }
                     } catch (e: Exception) {

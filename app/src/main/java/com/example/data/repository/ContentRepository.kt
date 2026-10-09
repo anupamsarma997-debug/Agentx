@@ -18,7 +18,8 @@ import java.util.UUID
 class ContentRepository(
     private val contentDao: ContentDao,
     private val creationEngine: ContentCreationEngine,
-    private val postImageGenerator: PostImageGenerator? = null
+    private val postImageGenerator: PostImageGenerator? = null,
+    private val opportunityDao: com.example.data.local.dao.OpportunityDao? = null
 ) {
 
     fun observeContentQueue(): Flow<List<ContentEntity>> = contentDao.getAllContent()
@@ -63,6 +64,7 @@ class ContentRepository(
 
     /**
      * Executes AI generation from an OpportunityEntity and persists the resulting draft/review item.
+     * Enforces strict anti-duplication so no opportunity is posted twice.
      */
     suspend fun generateContent(
         opportunity: OpportunityEntity,
@@ -70,8 +72,17 @@ class ContentRepository(
         platform: ContentPlatform = ContentPlatform.BOTH,
         length: ContentLength = ContentLength.SHORT,
         imageSize: PostImageSize = PostImageSize.SQUARE,
-        language: String = "ASSAMESE"
+        language: String = "ASSAMESE",
+        forceRegenerate: Boolean = false
     ): ContentCreationOutcome {
+        // Strict anti-duplication: "Joh joh opportunity ekbar update huye hai wo dusri bar nhi hona jiye"
+        val alreadyHasContent = contentDao.hasContentForOpportunity(opportunity.id)
+        if (!forceRegenerate && (opportunity.isPosted || alreadyHasContent)) {
+            return ContentCreationOutcome.Error(
+                "এই সুযোগৰ বাবে ইতিমধ্যে পোষ্ট প্ৰস্তুত কৰা হৈছে! একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয়। (Post already exists for this opportunity! No duplicate allowed.)"
+            )
+        }
+
         val fact = SourceFact.fromEntity(opportunity)
         val outcome = creationEngine.generateContent(
             fact = fact,
@@ -122,6 +133,9 @@ class ContentRepository(
                 imageUrl = targetImagePath
             )
             contentDao.insertContent(entity)
+            try {
+                opportunityDao?.markAsPosted(opportunity.id)
+            } catch (_: Exception) {}
         }
 
         return outcome

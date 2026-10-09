@@ -141,7 +141,9 @@ class OpportunityScoutEngine(
                         discoveredAt = existingEntity?.discoveredAt ?: now,
                         lastCheckedAt = now,
                         contentHash = contentHash,
-                        isExpired = false
+                        isExpired = false,
+                        isPosted = existingEntity?.isPosted ?: false,
+                        postedAt = existingEntity?.postedAt
                     )
 
                     itemsToInsert.add(entity)
@@ -152,7 +154,7 @@ class OpportunityScoutEngine(
         }
 
         if (itemsToInsert.isNotEmpty()) {
-            dao.insertOpportunities(itemsToInsert)
+            dao.upsertPreservingPostedStatus(itemsToInsert)
         }
 
         return ScoutResult(

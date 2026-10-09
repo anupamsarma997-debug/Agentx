@@ -16,7 +16,8 @@ import com.example.data.model.opportunity.VerificationStatus
         Index(value = ["region"]),
         Index(value = ["verificationStatus"]),
         Index(value = ["deadlineEpochMillis"]),
-        Index(value = ["discoveredAt"])
+        Index(value = ["discoveredAt"]),
+        Index(value = ["isPosted"])
     ]
 )
 data class OpportunityEntity(
@@ -39,7 +40,9 @@ data class OpportunityEntity(
     val discoveredAt: Long = System.currentTimeMillis(),
     val lastCheckedAt: Long = System.currentTimeMillis(),
     val contentHash: String,
-    val isExpired: Boolean = false
+    val isExpired: Boolean = false,
+    val isPosted: Boolean = false,
+    val postedAt: Long? = null
 ) {
     val categoryEnum: OpportunityCategory
         get() = OpportunityCategory.fromString(category)
@@ -52,4 +55,34 @@ data class OpportunityEntity(
 
     val sourceTierEnum: SourceTier
         get() = SourceTier.fromString(sourceTier)
+
+    /**
+     * Checks if this opportunity was discovered/published within the last 48 hours.
+     */
+    fun isFresh48Hours(): Boolean {
+        val fortyEightHoursAgo = System.currentTimeMillis() - (48L * 60 * 60 * 1000)
+        return discoveredAt >= fortyEightHoursAgo
+    }
+
+    /**
+     * Checks if this is a Government (Sarkari) scheme, recruitment, or portal update.
+     */
+    fun isSarkariUpdate(): Boolean {
+        val cat = category.uppercase()
+        if (cat.contains("GOVERNMENT") || cat.contains("SCHEME") || cat.contains("JOB") ||
+            cat.contains("MSME") || cat.contains("SCHOLARSHIP") || cat.contains("ASSAM")) {
+            return true
+        }
+        val url = sourceUrl.lowercase()
+        val domain = sourceDomain.lowercase()
+        if (url.contains(".gov.in") || url.contains(".nic.in") || domain.contains("gov.in") || domain.contains("nic.in")) {
+            return true
+        }
+        val org = (organization ?: "").lowercase()
+        val src = sourceName.lowercase()
+        val t = title.lowercase()
+        return org.contains("govt") || org.contains("government") || org.contains("চৰকাৰ") ||
+            src.contains("govt") || src.contains("government") || src.contains("চৰকাৰ") ||
+            t.contains("আঁচনি") || t.contains("নিযুক্তি") || t.contains("চৰকাৰী") || t.contains("sarkari")
+    }
 }

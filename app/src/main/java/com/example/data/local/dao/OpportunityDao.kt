@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.example.data.local.entity.OpportunityEntity
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,32 @@ interface OpportunityDao {
 
     @Update
     suspend fun updateOpportunity(opportunity: OpportunityEntity)
+
+    @Transaction
+    suspend fun upsertPreservingPostedStatus(opportunity: OpportunityEntity): Long {
+        val existing = getOpportunityByIdSync(opportunity.id) ?: findByContentHash(opportunity.contentHash)
+        return if (existing != null) {
+            val isAlreadyPosted = existing.isPosted || opportunity.isPosted
+            val postedTime = existing.postedAt ?: opportunity.postedAt
+            val merged = opportunity.copy(
+                id = existing.id,
+                isPosted = isAlreadyPosted,
+                postedAt = postedTime,
+                discoveredAt = existing.discoveredAt
+            )
+            updateOpportunity(merged)
+            1L
+        } else {
+            insertOpportunity(opportunity)
+        }
+    }
+
+    @Transaction
+    suspend fun upsertPreservingPostedStatus(opportunities: List<OpportunityEntity>) {
+        for (opp in opportunities) {
+            upsertPreservingPostedStatus(opp)
+        }
+    }
 
     @Query("SELECT * FROM opportunities ORDER BY discoveredAt DESC LIMIT :limit")
     fun getLatestOpportunities(limit: Int = 500): Flow<List<OpportunityEntity>>
@@ -73,4 +100,40 @@ interface OpportunityDao {
 
     @Query("SELECT COUNT(*) FROM opportunities WHERE verificationStatus = :status")
     fun countByVerificationStatus(status: String): Flow<Int>
+
+    @Query("UPDATE opportunities SET isPosted = 1, postedAt = :timestamp, lastCheckedAt = :timestamp WHERE id = :id")
+    suspend fun markAsPosted(id: String, timestamp: Long = System.currentTimeMillis())
+
+    @Query("UPDATE opportunities SET isPosted = 1, postedAt = :timestamp, lastCheckedAt = :timestamp WHERE id IN (:ids)")
+    suspend fun markMultipleAsPosted(ids: List<String>, timestamp: Long = System.currentTimeMillis())
+
+    @Query("SELECT * FROM opportunities WHERE isPosted = 0 AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
+    fun getUnpostedOpportunities(limit: Int = 500): Flow<List<OpportunityEntity>>
+
+    @Query("SELECT * FROM opportunities WHERE isPosted = 0 AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
+    suspend fun getUnpostedOpportunitiesSync(limit: Int = 500): List<OpportunityEntity>
+
+    @Query("SELECT * FROM opportunities WHERE discoveredAt >= :cutoffMillis AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
+    fun getFreshOpportunities48Hours(cutoffMillis: Long, limit: Int = 100): Flow<List<OpportunityEntity>>
+
+    @Query("SELECT * FROM opportunities WHERE discoveredAt >= :cutoffMillis AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
+    suspend fun getFreshOpportunities48HoursSync(cutoffMillis: Long, limit: Int = 100): List<OpportunityEntity>
+
+    @Query("SELECT * FROM opportunities WHERE isPosted = 0 AND discoveredAt >= :cutoffMillis AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
+    fun getFreshUnpostedOpportunities48Hours(cutoffMillis: Long, limit: Int = 100): Flow<List<OpportunityEntity>>
+
+    @Query("SELECT * FROM opportunities WHERE isPosted = 0 AND discoveredAt >= :cutoffMillis AND verificationStatus != 'REJECTED' ORDER BY discoveredAt DESC LIMIT :limit")
+    suspend fun getFreshUnpostedOpportunities48HoursSync(cutoffMillis: Long, limit: Int = 100): List<OpportunityEntity>
+
+    @Query("SELECT COUNT(*) FROM opportunities WHERE isPosted = 1")
+    fun countPosted(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM opportunities WHERE isPosted = 0")
+    fun countUnposted(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM opportunities WHERE discoveredAt >= :cutoffMillis AND verificationStatus != 'REJECTED'")
+    fun countFresh48Hours(cutoffMillis: Long): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM opportunities WHERE isPosted = 0 AND discoveredAt >= :cutoffMillis AND verificationStatus != 'REJECTED'")
+    fun countFreshUnposted48Hours(cutoffMillis: Long): Flow<Int>
 }

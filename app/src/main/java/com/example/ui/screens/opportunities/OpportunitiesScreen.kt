@@ -64,11 +64,13 @@ import com.example.data.local.entity.OpportunityEntity
 import com.example.data.model.opportunity.OpportunityCategory
 import com.example.data.model.opportunity.OpportunityRegion
 import com.example.ui.viewmodel.AppViewModel
+import com.example.ui.viewmodel.OpportunityPostFilter
 
 @Composable
 fun OpportunitiesScreen(
     viewModel: AppViewModel,
     onNavigateToDetail: (String) -> Unit = {},
+    onNavigateToGenerator: ((String?) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -76,6 +78,9 @@ fun OpportunitiesScreen(
     val isScanning by viewModel.isScanning.collectAsState()
     val selectedCategory by viewModel.selectedCategoryFilter.collectAsState()
     val selectedRegion by viewModel.selectedRegionFilter.collectAsState()
+    val selectedPostFilter by viewModel.selectedPostStatusFilter.collectAsState()
+    val postedOpportunityIds by viewModel.postedOpportunityIds.collectAsState()
+    val freshSarkariCount by viewModel.freshSarkari48hCount.collectAsState()
     val lastScoutResult by viewModel.lastScoutResult.collectAsState()
     var showPortalsDialog by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -206,13 +211,62 @@ fun OpportunitiesScreen(
         ) {
             // "All" Chip
             FilterChip(
-                selected = selectedCategory == null && selectedRegion == null,
+                selected = selectedPostFilter == OpportunityPostFilter.ALL && selectedCategory == null && selectedRegion == null,
                 onClick = {
+                    viewModel.setPostStatusFilter(OpportunityPostFilter.ALL)
                     viewModel.setCategoryFilter(null)
                     viewModel.setRegionFilter(null)
                 },
                 label = { Text("All") },
                 modifier = Modifier.testTag("filter_all")
+            )
+
+            // 48h Sarkari Updates Chip
+            FilterChip(
+                selected = selectedPostFilter == OpportunityPostFilter.FRESH_48H_SARKARI,
+                onClick = {
+                    viewModel.setPostStatusFilter(
+                        if (selectedPostFilter == OpportunityPostFilter.FRESH_48H_SARKARI) OpportunityPostFilter.ALL else OpportunityPostFilter.FRESH_48H_SARKARI
+                    )
+                },
+                label = { Text("🔥 সৰকাৰী (48h: $freshSarkariCount)") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFDCFCE7),
+                    selectedLabelColor = Color(0xFF166534)
+                ),
+                modifier = Modifier.testTag("filter_fresh_sarkari_48h")
+            )
+
+            // Unposted Only Chip
+            FilterChip(
+                selected = selectedPostFilter == OpportunityPostFilter.UNPOSTED_ONLY,
+                onClick = {
+                    viewModel.setPostStatusFilter(
+                        if (selectedPostFilter == OpportunityPostFilter.UNPOSTED_ONLY) OpportunityPostFilter.ALL else OpportunityPostFilter.UNPOSTED_ONLY
+                    )
+                },
+                label = { Text("✨ পোষ্ট নকৰা (Unposted)") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFEFF6FF),
+                    selectedLabelColor = Color(0xFF1D4ED8)
+                ),
+                modifier = Modifier.testTag("filter_unposted_only")
+            )
+
+            // Already Posted Chip
+            FilterChip(
+                selected = selectedPostFilter == OpportunityPostFilter.POSTED_ONLY,
+                onClick = {
+                    viewModel.setPostStatusFilter(
+                        if (selectedPostFilter == OpportunityPostFilter.POSTED_ONLY) OpportunityPostFilter.ALL else OpportunityPostFilter.POSTED_ONLY
+                    )
+                },
+                label = { Text("✓ ইতিমধ্যে পোষ্ট কৰা (Posted)") },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Color(0xFFF3F4F6),
+                    selectedLabelColor = Color(0xFF4B5563)
+                ),
+                modifier = Modifier.testTag("filter_posted_only")
             )
 
             // Regional Filter: Assam
@@ -440,12 +494,19 @@ fun OpportunitiesScreen(
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 items(opportunities, key = { it.id }) { opportunity ->
+                    val isAlreadyPosted = opportunity.isPosted || postedOpportunityIds.contains(opportunity.id)
                     OpportunityCard(
                         opportunity = opportunity,
+                        isAlreadyPosted = isAlreadyPosted,
                         onClick = { onNavigateToDetail(opportunity.id) },
                         onViewSource = {
                             val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(opportunity.sourceUrl))
                             context.startActivity(browserIntent)
+                        },
+                        onGeneratePost = {
+                            onNavigateToGenerator?.invoke(opportunity.id) ?: run {
+                                viewModel.generateContentForOpportunity(opportunity)
+                            }
                         }
                     )
                 }
@@ -457,8 +518,10 @@ fun OpportunitiesScreen(
 @Composable
 fun OpportunityCard(
     opportunity: OpportunityEntity,
+    isAlreadyPosted: Boolean = false,
     onClick: () -> Unit,
     onViewSource: () -> Unit,
+    onGeneratePost: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -466,27 +529,61 @@ fun OpportunityCard(
             .fillMaxWidth()
             .clickable { onClick() }
             .testTag("opportunity_card_${opportunity.id}"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isAlreadyPosted) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.75f) else MaterialTheme.colorScheme.surfaceContainer
+        ),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header: Category Tag & Status Badge
+            // Header: Category Tag & Status Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = opportunity.categoryEnum.displayName,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = opportunity.categoryEnum.displayName,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+
+                    if (opportunity.isFresh48Hours() && opportunity.isSarkariUpdate()) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFDCFCE7)
+                        ) {
+                            Text(
+                                text = "🔥 সৰকাৰী (48h)",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF166534)
+                            )
+                        }
+                    }
+
+                    if (isAlreadyPosted) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFF3F4F6)
+                        ) {
+                            Text(
+                                text = "✓ POSTED",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4B5563)
+                            )
+                        }
+                    }
                 }
 
                 VerificationBadge(status = opportunity.verificationStatusEnum)
@@ -566,7 +663,7 @@ fun OpportunityCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Source & View Source Action
+            // Source & Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -581,19 +678,45 @@ fun OpportunityCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                OutlinedButton(
-                    onClick = onViewSource,
-                    modifier = Modifier.testTag("btn_view_source_${opportunity.id}"),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("VIEW SOURCE", style = MaterialTheme.typography.labelSmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (isAlreadyPosted) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest
+                        ) {
+                            Text(
+                                text = "✓ ইতিমধ্যে প্ৰস্তুত",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    } else if (onGeneratePost != null) {
+                        FilledTonalButton(
+                            onClick = onGeneratePost,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_quick_create_${opportunity.id}")
+                        ) {
+                            Text("⚡ পোষ্ট বনাওক", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    OutlinedButton(
+                        onClick = onViewSource,
+                        modifier = Modifier.testTag("btn_view_source_${opportunity.id}"),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("SOURCE", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
             }
         }

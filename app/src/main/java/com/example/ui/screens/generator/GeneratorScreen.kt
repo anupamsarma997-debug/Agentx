@@ -90,6 +90,8 @@ fun GeneratorScreen(
     val batchProgressText by viewModel.batchProgressText.collectAsState()
     val batchProgressRatio by viewModel.batchProgressRatio.collectAsState()
     val settings by viewModel.settings.collectAsState()
+    val postedOpportunityIds by viewModel.postedOpportunityIds.collectAsState()
+    val freshSarkariList by viewModel.freshSarkari48hList.collectAsState()
 
     var selectedOpportunity by remember { mutableStateOf<OpportunityEntity?>(null) }
     var selectedContentType by remember { mutableStateOf(ContentType.OPPORTUNITY_POST) }
@@ -109,6 +111,17 @@ fun GeneratorScreen(
     var selectedWebsiteCategory by remember { mutableStateOf("ALL") }
     var showAllWebsites by remember { mutableStateOf(false) }
     var showAddOpportunityDialog by remember { mutableStateOf(false) }
+
+    // Auto-select initial unposted / fresh 48h opportunity if none selected
+    if (selectedOpportunity == null) {
+        selectedOpportunity = freshSarkariList.firstOrNull()
+            ?: opportunities.firstOrNull { it.verificationStatus == VerificationStatus.VERIFIED.name && !it.isPosted && !postedOpportunityIds.contains(it.id) }
+            ?: opportunities.firstOrNull { !it.isPosted && !postedOpportunityIds.contains(it.id) }
+            ?: opportunities.firstOrNull()
+            ?: CuratedOpportunityCatalog.ORUNODOI_3
+    }
+
+    val isSelectedAlreadyPosted = selectedOpportunity != null && (selectedOpportunity!!.isPosted || postedOpportunityIds.contains(selectedOpportunity!!.id))
 
     if (showAddOpportunityDialog) {
         AddOpportunityDialog(
@@ -136,16 +149,6 @@ fun GeneratorScreen(
                 )
             }
         )
-    }
-
-    // Auto-select initial verified opportunity if none selected
-    if (selectedOpportunity == null) {
-        selectedOpportunity = if (opportunities.isNotEmpty()) {
-            opportunities.firstOrNull { it.verificationStatus == VerificationStatus.VERIFIED.name }
-                ?: opportunities.first()
-        } else {
-            CuratedOpportunityCatalog.ORUNODOI_3
-        }
     }
 
     Column(
@@ -375,6 +378,18 @@ fun GeneratorScreen(
                             modifier = Modifier.testTag("btn_batch_assam_schemes")
                         ) {
                             Text("🏛️ All Assam Schemes", style = MaterialTheme.typography.labelSmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.batchGenerateAllOpportunities("SARKARI_48H", langParam) {
+                                    onNavigateToQueue()
+                                }
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("btn_batch_sarkari_48h")
+                        ) {
+                            Text("🔥 Daily 48h Sarkari (দৈনিক ৪৮ ঘণ্টীয়া চৰকাৰী)", style = MaterialTheme.typography.labelSmall)
                         }
 
                         OutlinedButton(
@@ -1112,6 +1127,45 @@ fun GeneratorScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
+                // Duplicate Prevention Warning Banner
+                if (isSelectedAlreadyPosted && selectedContentType != ContentType.MEME_POST) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("banner_already_posted_warning")
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = "⚠️ এই সুযোগৰ পোষ্ট ইতিমধ্যে তৈয়াৰ কৰা হৈছে! (ALREADY POSTED)",
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF991B1B),
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয় (No duplicate posts allowed). অনুগ্ৰহ কৰি আন এটা নতুন বা পোষ্ট নকৰা সুযোগ বাছক:",
+                                color = Color(0xFF7F1D1D),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    val nextUnposted = freshSarkariList.firstOrNull()
+                                        ?: opportunities.firstOrNull { !it.isPosted && !postedOpportunityIds.contains(it.id) }
+                                    if (nextUnposted != null) {
+                                        selectedOpportunity = nextUnposted
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("👉 বাছক নতুন ৪৮ ঘণ্টীয়া চৰকাৰী সুযোগ")
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 // Action Button: GENERATE DRAFT
                 Button(
                     onClick = {
@@ -1151,7 +1205,7 @@ fun GeneratorScreen(
                             }
                         }
                     },
-                    enabled = !isGenerating && (selectedOpportunity != null || selectedContentType == ContentType.MEME_POST),
+                    enabled = !isGenerating && (!isSelectedAlreadyPosted || selectedContentType == ContentType.MEME_POST) && (selectedOpportunity != null || selectedContentType == ContentType.MEME_POST),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
@@ -1165,6 +1219,8 @@ fun GeneratorScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("পোষ্ট আৰু ফটো প্ৰস্তুত হৈ আছে...")
+                    } else if (isSelectedAlreadyPosted && selectedContentType != ContentType.MEME_POST) {
+                        Text("⚠️ ইতিমধ্যে পোষ্ট কৰা হ'ল (ALREADY POSTED)")
                     } else {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))

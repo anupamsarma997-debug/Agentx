@@ -94,6 +94,9 @@ fun DashboardScreen(
     val approvedVerifCount by viewModel.verifiedApprovedCount.collectAsState()
     val blockedVerifCount by viewModel.verifiedBlockedCount.collectAsState()
     val expiredVerifCount by viewModel.verifiedExpiredCount.collectAsState()
+    val freshSarkariCount by viewModel.freshSarkari48hCount.collectAsState()
+    val postedCount by viewModel.postedCount.collectAsState()
+    val unpostedList by viewModel.unpostedOpportunities.collectAsState()
 
     val windowStatus = viewModel.getWindowStatus()
     val scrollState = rememberScrollState()
@@ -178,6 +181,135 @@ fun DashboardScreen(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                }
+            }
+        }
+
+        // 📅 DAILY 48-HOUR SARKARI UPDATES (দৈনিক ৪৮ ঘণ্টীয়া চৰকাৰী আপডেট)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("dashboard_daily_sarkari_card"),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFF0FDF4)
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = null,
+                            tint = Color(0xFF166534),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "📅 দৈনিক সৰকাৰী আপডেট (48H)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF166534)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFDCFCE7)
+                    ) {
+                        Text(
+                            text = "DAILY 48H",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF166534)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "দৈনিক যিবোৰ চৰকাৰী আঁচনি আৰু নিযুক্তি আহে তাৰ ৪৮ ঘণ্টাৰ আপডেট। এবাৰ আপডেট/পোষ্ট কৰা সুযোগ পুনৰ বনোৱা নহয়।",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF14532D)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFBBF7D0),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "$freshSarkariCount", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF166534))
+                            Text(text = "নতুন (48h)", style = MaterialTheme.typography.labelSmall, color = Color(0xFF166534))
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFE2E8F0),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "$postedCount", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+                            Text(text = "ইতিমধ্যে পোষ্ট কৰা", style = MaterialTheme.typography.labelSmall, color = Color(0xFF334155))
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFDBEAFE),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "${unpostedList.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1E40AF))
+                            Text(text = "পোষ্ট নকৰা বাকী", style = MaterialTheme.typography.labelSmall, color = Color(0xFF1E40AF))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.batchGenerateAllOpportunities("SARKARI_48H", "ASSAMESE") {
+                                onNavigateToQueue()
+                            }
+                        },
+                        modifier = Modifier.weight(1f).testTag("btn_daily_48h_generate"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("দৈনিক পোষ্ট বনাওক", style = MaterialTheme.typography.labelSmall)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.setPostStatusFilter(com.example.ui.viewmodel.OpportunityPostFilter.FRESH_48H_SARKARI)
+                            onNavigateToOpportunities()
+                        },
+                        modifier = Modifier.weight(1f).testTag("btn_daily_48h_view"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("৪৮h আপডেট চাওক", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }

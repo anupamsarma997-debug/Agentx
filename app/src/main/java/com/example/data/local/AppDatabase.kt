@@ -32,7 +32,7 @@ import com.example.data.local.entity.VerificationAuditLogEntity
         VerificationAuditLogEntity::class,
         AppLogEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -82,4 +82,13 @@ interface ContentDao {
 
     @Query("SELECT COUNT(*) FROM content_items WHERE createdAt >= :startOfDayMillis AND generationStatus IN ('GENERATED', 'APPROVED', 'REVIEW_REQUIRED')")
     fun countGeneratedSince(startOfDayMillis: Long): Flow<Int>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM content_items WHERE sourceOpportunityId = :opportunityId)")
+    suspend fun hasContentForOpportunity(opportunityId: String): Boolean
+
+    @Query("SELECT DISTINCT sourceOpportunityId FROM content_items")
+    fun getAllGeneratedOpportunityIds(): Flow<List<String>>
+
+    @Query("SELECT DISTINCT sourceOpportunityId FROM content_items")
+    suspend fun getAllGeneratedOpportunityIdsSync(): List<String>
 }
