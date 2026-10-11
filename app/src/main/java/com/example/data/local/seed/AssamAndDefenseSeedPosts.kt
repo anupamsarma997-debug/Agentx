@@ -19,55 +19,34 @@ object AssamAndDefenseSeedPosts {
         val seedList = getInitialSeedList()
         for (item in seedList) {
             val current = existingMap[item.id]
-            if (current == null) {
-                // Generate all 4 sizes (Square, Portrait, Landscape, Story) for each seed post
-                var defaultImagePath: String? = null
-                for (sz in PostImageSize.entries) {
-                    val path = try {
-                        postImageGenerator.generatePostBanner(
-                            contentId = item.id,
-                            title = item.title,
-                            category = item.caption,
-                            organization = item.sourceName,
-                            deadline = "2027",
-                            sourceUrl = item.sourceUrl,
-                            region = "Assam",
-                            size = sz
-                        )
-                    } catch (e: Exception) {
-                        null
-                    }
-                    if (sz == PostImageSize.SQUARE || defaultImagePath == null) {
-                        defaultImagePath = path
-                    }
+            // Generate all 4 sizes (Square, Portrait, Landscape, Story) for each seed post with new vibrant styling
+            var defaultImagePath: String? = null
+            for (sz in PostImageSize.entries) {
+                val path = try {
+                    postImageGenerator.generatePostBanner(
+                        contentId = item.id,
+                        title = item.title,
+                        category = item.caption,
+                        organization = item.sourceName,
+                        deadline = "2027",
+                        sourceUrl = item.sourceUrl,
+                        region = "Assam",
+                        size = sz,
+                        bodySnippet = item.body
+                    )
+                } catch (e: Exception) {
+                    null
                 }
+                if (sz == PostImageSize.SQUARE || defaultImagePath == null) {
+                    defaultImagePath = path
+                }
+            }
 
+            if (current == null) {
                 val finalEntity = item.copy(imageUrl = defaultImagePath)
                 contentDao.insertContent(finalEntity)
-            } else if (current.imageUrl.isNullOrBlank()) {
-                var defaultImagePath: String? = null
-                for (sz in PostImageSize.entries) {
-                    val path = try {
-                        postImageGenerator.generatePostBanner(
-                            contentId = current.id,
-                            title = current.title,
-                            category = current.caption,
-                            organization = current.sourceName,
-                            deadline = "2027",
-                            sourceUrl = current.sourceUrl,
-                            region = "Assam",
-                            size = sz
-                        )
-                    } catch (e: Exception) {
-                        null
-                    }
-                    if (sz == PostImageSize.SQUARE || defaultImagePath == null) {
-                        defaultImagePath = path
-                    }
-                }
-                if (defaultImagePath != null) {
-                    contentDao.updateImageUrl(current.id, defaultImagePath)
-                }
+            } else if (defaultImagePath != null) {
+                contentDao.updateImageUrl(current.id, defaultImagePath)
             }
         }
     }

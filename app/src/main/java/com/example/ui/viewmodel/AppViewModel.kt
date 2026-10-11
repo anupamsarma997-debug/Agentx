@@ -888,22 +888,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             } else {
-                val imagesDir = java.io.File(appCtx.filesDir, "post_images")
-                val sizeFile = java.io.File(imagesDir, "post_${item.id}_${size.id}.jpg")
-                if (sizeFile.exists()) {
-                    sizeFile.absolutePath
-                } else {
-                    postImageGenerator.generatePostBanner(
-                        contentId = item.id,
-                        title = item.title,
-                        category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
-                        organization = item.sourceName,
-                        deadline = null,
-                        sourceUrl = item.sourceUrl,
-                        region = null,
-                        size = size
-                    )
-                }
+                val opp = opportunityDao.getOpportunityByIdSync(item.sourceOpportunityId)
+                postImageGenerator.generatePostBanner(
+                    contentId = item.id,
+                    title = item.title,
+                    category = opp?.category ?: item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                    organization = opp?.organization ?: item.sourceName,
+                    deadline = opp?.deadline,
+                    sourceUrl = item.sourceUrl,
+                    region = opp?.region ?: "Assam",
+                    size = size,
+                    bodySnippet = item.body,
+                    eligibility = opp?.eligibility
+                )
             }
             if (targetPath != null) {
                 contentDao.updateImageUrl(item.id, targetPath)
@@ -916,6 +913,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val item = contentDao.getContentByIdSync(contentId) ?: return@launch
             val isMeme = item.contentType == ContentType.MEME_POST.name
+            val opp = opportunityDao.getOpportunityByIdSync(item.sourceOpportunityId)
             var defaultPath: String? = null
             PostImageSize.entries.forEach { sz ->
                 val path = if (isMeme) {
@@ -932,12 +930,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     postImageGenerator.generatePostBanner(
                         contentId = item.id,
                         title = item.title,
-                        category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
-                        organization = item.sourceName,
-                        deadline = null,
+                        category = opp?.category ?: item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                        organization = opp?.organization ?: item.sourceName,
+                        deadline = opp?.deadline,
                         sourceUrl = item.sourceUrl,
-                        region = null,
-                        size = sz
+                        region = opp?.region ?: "Assam",
+                        size = sz,
+                        bodySnippet = item.body,
+                        eligibility = opp?.eligibility
                     )
                 }
                 if (sz == PostImageSize.SQUARE || defaultPath == null) {
@@ -1973,22 +1973,54 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun regeneratePostImage(contentId: String, size: PostImageSize = PostImageSize.SQUARE) {
         viewModelScope.launch {
             val item = contentDao.getContentByIdSync(contentId) ?: return@launch
+            val opp = opportunityDao.getOpportunityByIdSync(item.sourceOpportunityId)
             val newImg = postImageGenerator.generatePostBanner(
                 contentId = item.id,
                 title = item.title,
-                category = item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
-                organization = item.sourceName,
-                deadline = null,
+                category = opp?.category ?: item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                organization = opp?.organization ?: item.sourceName,
+                deadline = opp?.deadline,
                 sourceUrl = item.sourceUrl,
-                region = null,
-                size = size
+                region = opp?.region ?: "Assam",
+                size = size,
+                bodySnippet = item.body,
+                eligibility = opp?.eligibility
             )
             if (newImg != null) {
                 contentDao.updateImageUrl(item.id, newImg)
-                showMessage("${size.displayName} banner image generated successfully!")
+                showMessage("✨ ${size.displayName} বেনাৰ নতুন আকৰ্ষণীয় ৰঙেৰে সজোৱা হ'ল!")
             } else {
                 showMessage("Failed to generate banner image.")
             }
+        }
+    }
+
+    fun regenerateAllQueueBanners() {
+        viewModelScope.launch {
+            val allPosts = contentDao.getAllContentSync()
+            var count = 0
+            allPosts.forEach { item ->
+                if (item.contentType != ContentType.MEME_POST.name) {
+                    val opp = opportunityDao.getOpportunityByIdSync(item.sourceOpportunityId)
+                    val newImg = postImageGenerator.generatePostBanner(
+                        contentId = item.id,
+                        title = item.title,
+                        category = opp?.category ?: item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                        organization = opp?.organization ?: item.sourceName,
+                        deadline = opp?.deadline,
+                        sourceUrl = item.sourceUrl,
+                        region = opp?.region ?: "Assam",
+                        size = PostImageSize.SQUARE,
+                        bodySnippet = item.body,
+                        eligibility = opp?.eligibility
+                    )
+                    if (newImg != null) {
+                        contentDao.updateImageUrl(item.id, newImg)
+                        count++
+                    }
+                }
+            }
+            showMessage("✨ $count টা পোষ্টৰ বেনাৰ নতুন বিভিন্ন ৰং আৰু সবিশেষেৰে আপডেট কৰা হ'ল!")
         }
     }
 

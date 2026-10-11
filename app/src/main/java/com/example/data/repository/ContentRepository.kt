@@ -98,7 +98,9 @@ class ContentRepository(
                     deadline = opportunity.deadline,
                     sourceUrl = outcome.result.sourceUrl,
                     region = opportunity.region,
-                    size = sz
+                    size = sz,
+                    bodySnippet = outcome.result.body,
+                    eligibility = opportunity.eligibility
                 )
                 if (sz == imageSize || targetImagePath == null) {
                     targetImagePath = generatedPath

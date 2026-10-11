@@ -300,6 +300,17 @@ fun ContentQueueScreen(
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(
+                    onClick = { viewModel.regenerateAllQueueBanners() },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.testTag("btn_refresh_all_banners")
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(12.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Refresh Designs", style = MaterialTheme.typography.labelSmall)
+                }
+
+                OutlinedButton(
                     onClick = { viewModel.batchApproveAllPosts() },
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(8.dp),
