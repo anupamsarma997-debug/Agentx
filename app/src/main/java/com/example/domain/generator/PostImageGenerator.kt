@@ -233,7 +233,7 @@ class PostImageGenerator(private val context: Context) {
                 PostImageSize.LANDSCAPE -> drawLandscapeLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
                 PostImageSize.PORTRAIT -> drawPortraitLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
                 PostImageSize.STORY -> drawStoryLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
-                PostImageSize.SQUARE -> drawSquareLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
+                PostImageSize.SQUARE -> drawSquareLayout(canvas, width, height, title, organization, sourceUrl, palette, details, contentId)
             }
 
             // Save bitmap with high quality
@@ -493,9 +493,204 @@ class PostImageGenerator(private val context: Context) {
     }
 
     /**
-     * SQUARE (1:1 - 1080x1080) Layout
+     * SQUARE (1:1 - 1080x1080) Multi-Archetype Layout Engine.
+     * Rotates between 4 completely different high-converting layout structures so feed posts never look "same same".
      */
     private fun drawSquareLayout(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        title: String,
+        organization: String?,
+        sourceUrl: String,
+        palette: BannerPalette,
+        details: ExtractedDetails,
+        contentId: String
+    ) {
+        val archetype = (contentId.hashCode().absoluteValue) % 4
+        when (archetype) {
+            0 -> drawSquareAlertLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
+            1 -> drawSquareMagazineLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
+            2 -> drawSquareGazetteLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
+            else -> drawSquareHeroSplitLayout(canvas, width, height, title, organization, sourceUrl, palette, details)
+        }
+    }
+
+    /**
+     * ARCHETYPE 0: High-Impact Urgent Sarkari Alert Poster ("BREAKING ALERT" style)
+     */
+    private fun drawSquareAlertLayout(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        title: String,
+        organization: String?,
+        sourceUrl: String,
+        palette: BannerPalette,
+        details: ExtractedDetails
+    ) {
+        // 1. Full-width top alert banner strip
+        val alertRibbonRect = RectF(0f, 0f, width.toFloat(), 76f)
+        val alertRibbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.badgeBg }
+        canvas.drawRect(alertRibbonRect, alertRibbonPaint)
+
+        val alertTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.badgeText
+            textSize = 30f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            letterSpacing = 0.05f
+        }
+        val alertNotice = "🚨 জৰুৰী চৰকাৰী জাননী • BREAKING SARKARI ALERT 🚨"
+        val anWidth = alertTextPaint.measureText(alertNotice)
+        canvas.drawText(alertNotice, (width - anWidth) / 2f, 50f, alertTextPaint)
+
+        // 2. Main card body
+        val outerMargin = 45f
+        val cardRect = RectF(outerMargin, 96f, width - outerMargin, height - outerMargin)
+        drawCardContainer(canvas, cardRect, palette.accentColor)
+
+        // Category Tag & Live Notice Tag
+        val topPillY = 120f
+        val catText = details.categoryBadge
+        val catPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textSize = 28f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val catWidth = catPaint.measureText(catText)
+        val catPillRect = RectF(70f, topPillY, 70f + catWidth + 48f, topPillY + 54f)
+        val catPillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.accentColor }
+        canvas.drawRoundRect(catPillRect, 27f, 27f, catPillPaint)
+        canvas.drawText(catText, 94f, topPillY + 38f, catPaint)
+
+        val liveTag = "● LIVE ONLINE"
+        val livePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 26f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val liveWidth = livePaint.measureText(liveTag)
+        canvas.drawText(liveTag, width - 70f - liveWidth, topPillY + 38f, livePaint)
+
+        // 3. Huge Punchy Title (Max 3 lines, massive 52sp)
+        val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 50f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            setShadowLayer(14f, 0f, 6f, 0xCC000000.toInt())
+        }
+        val maxTitleWidth = width - 140
+        val cleanTitle = if (title.length > 115) title.take(112) + "..." else title
+        val titleLayout = StaticLayout.Builder.obtain(cleanTitle, 0, cleanTitle.length, titlePaint, maxTitleWidth)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(8f, 1f)
+            .setMaxLines(3)
+            .build()
+
+        val titleY = topPillY + 76f
+        canvas.save()
+        canvas.translate(70f, titleY)
+        titleLayout.draw(canvas)
+        canvas.restore()
+
+        val titleBottomY = titleY + titleLayout.height + 20f
+
+        // 4. Hero Feature Highlight Box (Prominent Benefit Badge)
+        val heroBoxTop = titleBottomY
+        val heroBoxHeight = 110f
+        val heroBoxRect = RectF(70f, heroBoxTop, width - 70f, heroBoxTop + heroBoxHeight)
+        val heroBoxBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x40000000 }
+        val heroBoxBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.accentColor
+            style = Paint.Style.STROKE
+            strokeWidth = 3.5f
+        }
+        canvas.drawRoundRect(heroBoxRect, 24f, 24f, heroBoxBg)
+        canvas.drawRoundRect(heroBoxRect, 24f, 24f, heroBoxBorder)
+
+        // Accent indicator bar inside hero box
+        val heroBarRect = RectF(75f, heroBoxTop + 14f, 85f, heroBoxTop + heroBoxHeight - 14f)
+        val heroBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.accentColor }
+        canvas.drawRoundRect(heroBarRect, 5f, 5f, heroBarPaint)
+
+        val heroTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.accentColor
+            textSize = 34f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val cleanHero = if (details.benefitText.length > 40) details.benefitText.take(38) + "..." else details.benefitText
+        canvas.drawText("⚡  $cleanHero", 102f, heroBoxTop + 52f, heroTextPaint)
+
+        val subHeroPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            alpha = 230
+            textSize = 24f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        }
+        canvas.drawText("অসম চৰকাৰৰ অফিচিয়েল প'ৰ্টেলৰ জৰিয়তে পোনপটীয়া সুবিধা গ্ৰহণ কৰক", 102f, heroBoxTop + 90f, subHeroPaint)
+
+        // 5. Two Side-by-Side Detail Badges (Eligibility & Deadline)
+        val chipsY = heroBoxTop + heroBoxHeight + 20f
+        val chipW = (width - 160f) / 2f
+        val chipH = 92f
+
+        // Left Chip: Eligibility
+        val leftChipRect = RectF(70f, chipsY, 70f + chipW, chipsY + chipH)
+        val chipBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x2EFFFFFF }
+        val chipStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            alpha = 60
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+        canvas.drawRoundRect(leftChipRect, 18f, 18f, chipBgPaint)
+        canvas.drawRoundRect(leftChipRect, 18f, 18f, chipStroke)
+
+        val chipTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.accentColor
+            textSize = 22f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val chipValPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 25f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        canvas.drawText("📌 শিক্ষাগত অৰ্হতা", 85f, chipsY + 34f, chipTitlePaint)
+        val cleanElig = if (details.eligibilityText.length > 26) details.eligibilityText.take(24) + "..." else details.eligibilityText
+        canvas.drawText(cleanElig, 85f, chipsY + 70f, chipValPaint)
+
+        // Right Chip: Deadline / Fee
+        val rightX = 70f + chipW + 20f
+        val rightChipRect = RectF(rightX, chipsY, rightX + chipW, chipsY + chipH)
+        canvas.drawRoundRect(rightChipRect, 18f, 18f, chipBgPaint)
+        canvas.drawRoundRect(rightChipRect, 18f, 18f, chipStroke)
+
+        canvas.drawText("⏳ অন্তিম তাৰিখ / মাচুল", rightX + 15f, chipsY + 34f, chipTitlePaint)
+        val cleanDead = if (details.deadlineText.length > 26) details.deadlineText.take(24) + "..." else details.deadlineText
+        canvas.drawText(cleanDead, rightX + 15f, chipsY + 70f, chipValPaint)
+
+        // 6. Action Button
+        val ctaY = height - 190f
+        drawCtaBanner(
+            canvas = canvas,
+            left = 70f,
+            top = ctaY,
+            right = width - 70f,
+            bottom = ctaY + 76f,
+            bgColor = palette.ctaBg,
+            textColor = palette.ctaText,
+            text = details.ctaText
+        )
+
+        // 7. Footer URL
+        drawFooterUrl(canvas, width, height - 72f, sourceUrl)
+    }
+
+    /**
+     * ARCHETYPE 1: Modern Magazine Spotlight Card ("SPOTLIGHT VIRAL" style)
+     */
+    private fun drawSquareMagazineLayout(
         canvas: Canvas,
         width: Int,
         height: Int,
@@ -528,7 +723,7 @@ class PostImageGenerator(private val context: Context) {
         canvas.drawText(catText, 104f, pillTop + 38f, catPaint)
 
         // Top-right Verified Badge
-        val verifiedText = "✓ VERIFIED 48H"
+        val verifiedText = "★ VERIFIED 2026"
         val vPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = palette.accentColor
             textSize = 26f
@@ -537,7 +732,7 @@ class PostImageGenerator(private val context: Context) {
         val vWidth = vPaint.measureText(verifiedText)
         canvas.drawText(verifiedText, width - 80f - vWidth, pillTop + 38f, vPaint)
 
-        // 3. Main Title (Crisp, High Contrast, Max 3 lines)
+        // 3. Main Title
         val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 48f
@@ -593,6 +788,284 @@ class PostImageGenerator(private val context: Context) {
             bottom = ctaY + 76f,
             bgColor = palette.ctaBg,
             textColor = palette.ctaText,
+            text = details.ctaText
+        )
+
+        // 7. Footer URL
+        drawFooterUrl(canvas, width, height - 72f, sourceUrl)
+    }
+
+    /**
+     * ARCHETYPE 2: Official Government Gazette / Royal Seal ("SARKARI GAZETTE" style)
+     */
+    private fun drawSquareGazetteLayout(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        title: String,
+        organization: String?,
+        sourceUrl: String,
+        palette: BannerPalette,
+        details: ExtractedDetails
+    ) {
+        val outerMargin = 45f
+
+        // Royal dual border: thick outer line, thin inner gold line
+        val outerRect = RectF(outerMargin, outerMargin, width - outerMargin, height - outerMargin)
+        val outerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            alpha = 70
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        val cardBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x2A000000 }
+        canvas.drawRoundRect(outerRect, 28f, 28f, cardBgPaint)
+        canvas.drawRoundRect(outerRect, 28f, 28f, outerBorderPaint)
+
+        val innerRect = RectF(outerMargin + 14f, outerMargin + 14f, width - outerMargin - 14f, height - outerMargin - 14f)
+        val innerBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.accentColor
+            alpha = 110
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+        canvas.drawRoundRect(innerRect, 20f, 20f, innerBorderPaint)
+
+        // 1. Royal Gazette Top Header Ribbon
+        val gazetteRibbon = RectF(outerMargin + 14f, outerMargin + 14f, width - outerMargin - 14f, outerMargin + 82f)
+        val gazetteRibbonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.headerRibbonBg }
+        canvas.drawRoundRect(gazetteRibbon, 20f, 20f, gazetteRibbonPaint)
+
+        val gazetteTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.headerRibbonText
+            textSize = 28f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            letterSpacing = 0.04f
+        }
+        val gazetteHeader = "🏛  অসম চৰকাৰৰ অফিচিয়েল গেজেট জাননী • GOVT GAZETTE"
+        val ghWidth = gazetteTextPaint.measureText(gazetteHeader)
+        canvas.drawText(gazetteHeader, (width - ghWidth) / 2f, outerMargin + 58f, gazetteTextPaint)
+
+        // 2. Official Gazette Serial / Notice Tag
+        val serialY = outerMargin + 115f
+        val serialText = "অফিচিয়েল জাননী নং: AS/2026/GOVT-NOTIF"
+        val serialPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.accentColor
+            textSize = 25f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        canvas.drawText(serialText, 85f, serialY, serialPaint)
+
+        val dateTag = "তাৰিখ: ২০২৬ চন"
+        val dtPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            alpha = 200
+            textSize = 24f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val dtWidth = dtPaint.measureText(dateTag)
+        canvas.drawText(dateTag, width - 85f - dtWidth, serialY, dtPaint)
+
+        // 3. Gazette Title
+        val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 46f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            setShadowLayer(10f, 0f, 5f, 0xCC000000.toInt())
+        }
+        val maxTitleWidth = width - 170
+        val cleanTitle = if (title.length > 115) title.take(112) + "..." else title
+        val titleLayout = StaticLayout.Builder.obtain(cleanTitle, 0, cleanTitle.length, titlePaint, maxTitleWidth)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(8f, 1f)
+            .setMaxLines(3)
+            .build()
+
+        val titleY = serialY + 25f
+        canvas.save()
+        canvas.translate(85f, titleY)
+        titleLayout.draw(canvas)
+        canvas.restore()
+
+        val titleBottomY = titleY + titleLayout.height + 25f
+
+        // 4. Checklist 4-Box Grid (2x2 Grid of Official Details)
+        val gridY = titleBottomY
+        val colW = (width - 190f) / 2f
+        val rowH = 86f
+        val gap = 16f
+
+        drawGazetteCheckItem(canvas, 85f, gridY, 85f + colW, gridY + rowH, "✓ মূল সুবিধা", details.benefitText, palette.accentColor)
+        drawGazetteCheckItem(canvas, 85f + colW + gap, gridY, width - 85f, gridY + rowH, "✓ শিক্ষাগত অৰ্হতা", details.eligibilityText, 0xFF38BDF8.toInt())
+        drawGazetteCheckItem(canvas, 85f, gridY + rowH + gap, 85f + colW, gridY + (rowH * 2) + gap, "✓ আবেদন মাচুল", "বিনামূলীয়া (০ টকা)", 0xFF34D399.toInt())
+        drawGazetteCheckItem(canvas, 85f + colW + gap, gridY + rowH + gap, width - 85f, gridY + (rowH * 2) + gap, "✓ অন্তিম তাৰিখ", details.deadlineText, 0xFFFBBF24.toInt())
+
+        // 5. Official Verification Stamp
+        val sealY = gridY + (rowH * 2) + gap + 35f
+        val sealPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.accentColor
+            alpha = 220
+            textSize = 25f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val sealText = "✓ প্ৰমাণিত চৰকাৰী জাননী • ১০০% VERIFIED OFFICIAL PORTAL"
+        val stWidth = sealPaint.measureText(sealText)
+        canvas.drawText(sealText, (width - stWidth) / 2f, sealY, sealPaint)
+
+        // 6. Action Button
+        val ctaY = height - 180f
+        drawCtaBanner(
+            canvas = canvas,
+            left = 85f,
+            top = ctaY,
+            right = width - 85f,
+            bottom = ctaY + 74f,
+            bgColor = palette.ctaBg,
+            textColor = palette.ctaText,
+            text = "অনলাইন আবেদনৰ অফিচিয়েল লিংক চাওক ➔"
+        )
+
+        // 7. Footer URL
+        drawFooterUrl(canvas, width, height - 68f, sourceUrl)
+    }
+
+    private fun drawGazetteCheckItem(
+        canvas: Canvas,
+        left: Float,
+        top: Float,
+        right: Float,
+        bottom: Float,
+        label: String,
+        value: String,
+        accent: Int
+    ) {
+        val rect = RectF(left, top, right, bottom)
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0x33000000 }
+        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            alpha = 100
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+        canvas.drawRoundRect(rect, 16f, 16f, bgPaint)
+        canvas.drawRoundRect(rect, 16f, 16f, strokePaint)
+
+        val lblPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textSize = 21f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        canvas.drawText(label, left + 16f, top + 32f, lblPaint)
+
+        val valPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 25f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val clean = if (value.length > 25) value.take(23) + "..." else value
+        canvas.drawText(clean, left + 16f, top + 66f, valPaint)
+    }
+
+    /**
+     * ARCHETYPE 3: Bold Split-Hero Visual Card ("JOH DIKHTA HAI WO BIKTA HAI" style)
+     */
+    private fun drawSquareHeroSplitLayout(
+        canvas: Canvas,
+        width: Int,
+        height: Int,
+        title: String,
+        organization: String?,
+        sourceUrl: String,
+        palette: BannerPalette,
+        details: ExtractedDetails
+    ) {
+        // 1. Giant Top Hero Angle Block (Vibrant header for eye-catching visual separation)
+        val headerHeight = 110f
+        val headerRect = RectF(0f, 0f, width.toFloat(), headerHeight)
+        val headerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.badgeBg }
+        canvas.drawRect(headerRect, headerPaint)
+
+        val badgeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.badgeText
+            textSize = 34f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val headerTitle = "📢 ${details.categoryBadge}"
+        val htWidth = badgeTextPaint.measureText(headerTitle)
+        canvas.drawText(headerTitle, (width - htWidth) / 2f, 68f, badgeTextPaint)
+
+        // 2. Inner Card Frame
+        val outerMargin = 45f
+        val cardRect = RectF(outerMargin, headerHeight + 20f, width - outerMargin, height - outerMargin)
+        drawCardContainer(canvas, cardRect, palette.accentColor)
+
+        // 3. Bold Headline (52sp, double shadow)
+        val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 50f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            setShadowLayer(14f, 0f, 6f, 0xCC000000.toInt())
+        }
+        val maxTitleWidth = width - 150
+        val cleanTitle = if (title.length > 115) title.take(112) + "..." else title
+        val titleLayout = StaticLayout.Builder.obtain(cleanTitle, 0, cleanTitle.length, titlePaint, maxTitleWidth)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(8f, 1f)
+            .setMaxLines(3)
+            .build()
+
+        val titleY = headerHeight + 45f
+        canvas.save()
+        canvas.translate(75f, titleY)
+        titleLayout.draw(canvas)
+        canvas.restore()
+
+        val titleBottomY = titleY + titleLayout.height + 25f
+
+        // 4. Giant Hero Benefit Card (High-converting contrast banner)
+        val heroBoxTop = titleBottomY
+        val heroBoxHeight = 120f
+        val heroBoxRect = RectF(75f, heroBoxTop, width - 75f, heroBoxTop + heroBoxHeight)
+        val heroBoxBg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = palette.ctaBg }
+        canvas.drawRoundRect(heroBoxRect, 24f, 24f, heroBoxBg)
+
+        val heroTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.ctaText
+            textSize = 36f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        val cleanHero = if (details.benefitText.length > 38) details.benefitText.take(36) + "..." else details.benefitText
+        val hbWidth = heroTextPaint.measureText(cleanHero)
+        canvas.drawText(cleanHero, 75f + ((width - 150f - hbWidth) / 2f), heroBoxTop + 54f, heroTextPaint)
+
+        val heroSubPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = palette.ctaText
+            alpha = 220
+            textSize = 25f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        }
+        val subHero = "★ সকলো যোগ্য প্ৰাৰ্থীয়ে শীঘ্ৰে অনলাইন আবেদন কৰক ★"
+        val shWidth = heroSubPaint.measureText(subHero)
+        canvas.drawText(subHero, 75f + ((width - 150f - shWidth) / 2f), heroBoxTop + 96f, heroSubPaint)
+
+        // 5. Two Big Stacked Details Chips (Eligibility & Deadline)
+        val chipsTop = heroBoxTop + heroBoxHeight + 22f
+        val stripHeight = 72f
+        val gap = 16f
+
+        drawSingleChip(canvas, 75f, chipsTop, width - 75f, chipsTop + stripHeight, "🎯 ${details.eligibilityText}", palette.accentColor, isHighlighted = true)
+        drawSingleChip(canvas, 75f, chipsTop + stripHeight + gap, width - 75f, chipsTop + (stripHeight * 2) + gap, "⏳ ${details.deadlineText}", 0xFFFBBF24.toInt(), isHighlighted = false)
+
+        // 6. Action Button
+        val ctaY = height - 190f
+        drawCtaBanner(
+            canvas = canvas,
+            left = 75f,
+            top = ctaY,
+            right = width - 75f,
+            bottom = ctaY + 76f,
+            bgColor = palette.accentColor,
+            textColor = Color.BLACK,
             text = details.ctaText
         )
 

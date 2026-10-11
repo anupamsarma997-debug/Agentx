@@ -312,6 +312,21 @@ fun DashboardScreen(
                         Text("৪৮h আপডেট চাওক", style = MaterialTheme.typography.labelSmall)
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.refreshDailySarkariUpdates()
+                    },
+                    colors = ButtonDefaults.filledTonalButtonColors(),
+                    modifier = Modifier.fillMaxWidth().testTag("btn_daily_scout_50_websites"),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("🔄 ৫০+ চৰকাৰী ৱেবছাইটৰ পৰা নতুন আপডেট আনক (Scan Portals)", style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
 

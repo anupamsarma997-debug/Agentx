@@ -60,6 +60,7 @@ import com.example.data.remote.scout.ScholarshipsComprehensiveSourceProvider
 import com.example.data.remote.scout.InternshipsComprehensiveSourceProvider
 import com.example.data.remote.scout.OfficialPortalDirectory
 import com.example.data.remote.scout.OfficialPortalDirectorySourceProvider
+import com.example.data.remote.scout.DailyWorkingWebsitesScoutProvider
 import com.example.data.repository.ContentRepository
 import com.example.data.repository.MetaConnectionRepository
 import com.example.data.repository.OpportunityRepository
@@ -137,6 +138,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val scoutEngine = OpportunityScoutEngine(
         dao = opportunityDao,
         providers = listOf(
+            DailyWorkingWebsitesScoutProvider(),
             OfficialPortalDirectorySourceProvider(),
             AssamGovernmentSchemesSourceProvider(),
             MsmeComprehensiveSourceProvider(),
@@ -445,14 +447,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (finalPostedIds.isNotEmpty()) {
                     opportunityDao.markMultipleAsPosted(finalPostedIds)
                 }
+                regenerateAllQueueBannersSilent()
             } catch (e: Exception) {
                 AppLogger.warn("Seed", "Posts", "Notice during post seeding: ${e.localizedMessage}")
             }
         }
     }
 
+    private var lastUserMessage: String? = null
+    private var lastUserMessageTimestamp: Long = 0L
+
     fun showMessage(message: String) {
-        _userMessage.value = message
+        val now = System.currentTimeMillis()
+        val trimmed = message.trim()
+        // Deduplicate identical messages received within 30 seconds to prevent annoying notification spam
+        if (trimmed == lastUserMessage && (now - lastUserMessageTimestamp) < 30_000L) {
+            return
+        }
+        lastUserMessage = trimmed
+        lastUserMessageTimestamp = now
+        _userMessage.value = trimmed
     }
 
     fun clearMessage() {
@@ -1642,7 +1656,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (e: Exception) {
                     AppLogger.warn("Automation", "Scheduler", "Background scheduler tick error: ${e.message}")
                 }
-                delay(30000) // Re-check every 30 seconds
+                delay(15 * 60 * 1000) // Re-check every 15 minutes (avoids tight loop and repetitive notification spam)
             }
         }
     }
@@ -1788,13 +1802,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     AppLogger.warn("Automation", "JobComplete", summary)
                 }
-                if (!isAutoScheduled || postsPublished > 0 || errors.isNotEmpty()) {
+                if (!isAutoScheduled) {
                     showMessage(summary)
+                } else if (postsPublished > 0) {
+                    showMessage("✅ দৈনিক চৰকাৰী আপডেট: $postsPublished টা পোষ্ট ফেচবুক পেজত সফলতাৰে প্ৰকাশ কৰা হ'ল!")
                 }
             } catch (e: Exception) {
                 val fatal = "Automation job error: ${e.localizedMessage}"
                 AppLogger.error("Automation", "JobFatal", fatal, e)
-                showMessage(fatal)
+                if (!isAutoScheduled) {
+                    showMessage(fatal)
+                }
             } finally {
                 _isAutomationRunning.value = false
             }
@@ -1991,6 +2009,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 showMessage("✨ ${size.displayName} বেনাৰ নতুন আকৰ্ষণীয় ৰঙেৰে সজোৱা হ'ল!")
             } else {
                 showMessage("Failed to generate banner image.")
+            }
+        }
+    }
+
+    fun regenerateAllQueueBannersSilent() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val allPosts = contentDao.getAllContentSync()
+            allPosts.forEach { item ->
+                if (item.contentType != ContentType.MEME_POST.name) {
+                    val opp = opportunityDao.getOpportunityByIdSync(item.sourceOpportunityId)
+                    val newImg = postImageGenerator.generatePostBanner(
+                        contentId = item.id,
+                        title = item.title,
+                        category = opp?.category ?: item.caption.takeIf { it.isNotBlank() } ?: "Opportunity",
+                        organization = opp?.organization ?: item.sourceName,
+                        deadline = opp?.deadline,
+                        sourceUrl = item.sourceUrl,
+                        region = opp?.region ?: "Assam",
+                        size = PostImageSize.SQUARE,
+                        bodySnippet = item.body,
+                        eligibility = opp?.eligibility
+                    )
+                    if (newImg != null) {
+                        contentDao.updateImageUrl(item.id, newImg)
+                    }
+                }
             }
         }
     }
