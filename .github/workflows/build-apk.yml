@@ -76,32 +76,41 @@ jobs:
         run: |
           mkdir -p build-artifacts
           cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/SocialAgent.apk
+          cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/SocialAgent-debug.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SocialAgent-APK
-          path: build-artifacts/SocialAgent.apk
+          path: build-artifacts/*.apk
           retention-days: 30
 
       - name: Create or Update GitHub Release with APK
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch') && !github.event.pull_request
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: "SocialAgent Latest APK"
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "SocialAgent Android APK (Build #${{ github.run_number }})"
+          make_latest: true
           body: |
             ## 📱 SocialAgent - Latest Android APK
 
             Download and install the APK directly on your Android phone:
-            - **SocialAgent.apk**
+            - **SocialAgent.apk** (Latest compiled build)
 
-            ### ✨ Features:
-            - Instant Post Generation & One-Tap Sharing
-            - 130+ Assam & Northeast Citizen Portals & Schemes
-            - Anti-duplication tracking with Room Database
-          files: build-artifacts/SocialAgent.apk
+            ### ✨ Highlights:
+            - **Build Number:** #${{ github.run_number }}
+            - **Status:** Verified clean compilation
+            - **Features:** Instant Post Generator, Assam & Northeast Citizen Schemes & Defense Portals, Verification Guardrails, Meta/Facebook Integration.
+
+            ### 📲 Installation Guide:
+            1. Tap on `SocialAgent.apk` below to download.
+            2. Open the downloaded file on your Android device.
+            3. If prompted by Android, tap "Allow install from unknown sources" or "Install anyway".
+          files: |
+            build-artifacts/SocialAgent.apk
+            build-artifacts/SocialAgent-debug.apk
           draft: false
           prerelease: false
         env:
