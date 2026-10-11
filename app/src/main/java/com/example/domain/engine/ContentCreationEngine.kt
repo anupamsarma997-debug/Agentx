@@ -18,7 +18,11 @@ sealed interface GenerationGateResult {
 }
 
 sealed interface ContentCreationOutcome {
-    data class Success(val result: GeneratedContentResult, val initialStatus: GenerationStatus) : ContentCreationOutcome
+    data class Success(
+        val result: GeneratedContentResult,
+        val initialStatus: GenerationStatus,
+        val contentId: String? = null
+    ) : ContentCreationOutcome
     data class ConfigurationRequired(val message: String) : ContentCreationOutcome
     data class Error(val message: String) : ContentCreationOutcome
 }

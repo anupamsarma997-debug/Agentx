@@ -73,16 +73,8 @@ class ContentRepository(
         length: ContentLength = ContentLength.SHORT,
         imageSize: PostImageSize = PostImageSize.SQUARE,
         language: String = "ASSAMESE",
-        forceRegenerate: Boolean = false
+        forceRegenerate: Boolean = true
     ): ContentCreationOutcome {
-        // Strict anti-duplication: "Joh joh opportunity ekbar update huye hai wo dusri bar nhi hona jiye"
-        val alreadyHasContent = contentDao.hasContentForOpportunity(opportunity.id)
-        if (!forceRegenerate && (opportunity.isPosted || alreadyHasContent)) {
-            return ContentCreationOutcome.Error(
-                "এই সুযোগৰ বাবে ইতিমধ্যে পোষ্ট প্ৰস্তুত কৰা হৈছে! একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয়। (Post already exists for this opportunity! No duplicate allowed.)"
-            )
-        }
-
         val fact = SourceFact.fromEntity(opportunity)
         val outcome = creationEngine.generateContent(
             fact = fact,
@@ -136,6 +128,12 @@ class ContentRepository(
             try {
                 opportunityDao?.markAsPosted(opportunity.id)
             } catch (_: Exception) {}
+
+            return ContentCreationOutcome.Success(
+                result = outcome.result,
+                initialStatus = outcome.initialStatus,
+                contentId = contentId
+            )
         }
 
         return outcome

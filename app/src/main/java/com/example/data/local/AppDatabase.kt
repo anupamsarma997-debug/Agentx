@@ -10,6 +10,7 @@ import com.example.data.local.dao.ContentVersionDao
 import com.example.data.local.dao.FinalVerificationDao
 import com.example.data.local.dao.MemeDao
 import com.example.data.local.dao.OpportunityDao
+import com.example.data.local.dao.PostedContentTrackerDao
 import com.example.data.local.dao.ReelDao
 import com.example.data.local.dao.VerificationAuditLogDao
 import com.example.data.local.entity.AppLogEntity
@@ -18,6 +19,7 @@ import com.example.data.local.entity.ContentVersionEntity
 import com.example.data.local.entity.FinalVerificationRecordEntity
 import com.example.data.local.entity.MemeDraftEntity
 import com.example.data.local.entity.OpportunityEntity
+import com.example.data.local.entity.PostedContentTrackerEntity
 import com.example.data.local.entity.ReelDraftEntity
 import com.example.data.local.entity.VerificationAuditLogEntity
 
@@ -30,9 +32,10 @@ import com.example.data.local.entity.VerificationAuditLogEntity
         FinalVerificationRecordEntity::class,
         ContentVersionEntity::class,
         VerificationAuditLogEntity::class,
-        AppLogEntity::class
+        AppLogEntity::class,
+        PostedContentTrackerEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -45,6 +48,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun contentVersionDao(): ContentVersionDao
     abstract fun verificationAuditLogDao(): VerificationAuditLogDao
     abstract fun appLogDao(): AppLogDao
+    abstract fun postedContentTrackerDao(): PostedContentTrackerDao
 
     companion object {
         @Volatile

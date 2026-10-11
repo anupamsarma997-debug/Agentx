@@ -91,4 +91,7 @@ interface ContentDao {
 
     @Query("SELECT DISTINCT sourceOpportunityId FROM content_items")
     suspend fun getAllGeneratedOpportunityIdsSync(): List<String>
+
+    @Query("SELECT * FROM content_items WHERE sourceOpportunityId = :opportunityId ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getLatestContentByOpportunitySync(opportunityId: String): ContentEntity?
 }

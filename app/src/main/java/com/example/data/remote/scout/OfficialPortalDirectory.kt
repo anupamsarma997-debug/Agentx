@@ -1037,6 +1037,310 @@ object OfficialPortalDirectory {
             department = "Verified Educational Trust",
             description = "India's largest scholarship gateway aggregating corporate CSR merit grants, Tata Trust scholarships, and HDFC Badhte Kadam.",
             badgeText = "Buddy4Study"
+        ),
+
+        // ==========================================
+        // 6. CITIZEN WELFARE & AAM INSAAN EMPOWERMENT (30 New Impact Portals)
+        // ==========================================
+        OfficialPortalInfo(
+            id = "assam_rcms",
+            name = "Assam Ration Card Management System (RCMS)",
+            url = "https://rcms.assam.gov.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Food, Civil Supplies & Consumer Affairs Assam",
+            description = "Online portal for applying new NFSA Ration Card, adding family members, and availing free monthly rice and pulses for low-income families.",
+            badgeText = "Ration Card",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "india_eshram",
+            name = "e-Shram National Worker Database",
+            url = "https://eshram.gov.in",
+            category = OpportunityCategory.MSME,
+            department = "Ministry of Labour & Employment",
+            description = "Universal national identity for unorganised workers (construction workers, migrant labourers, street vendors, domestic workers) with ₹2 Lakh accident cover.",
+            badgeText = "e-Shram",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_pmkisan",
+            name = "PM-KISAN Samman Nidhi Portal",
+            url = "https://pmkisan.gov.in",
+            category = OpportunityCategory.GOVERNMENT_SCHEME,
+            department = "Ministry of Agriculture & Farmers Welfare",
+            description = "Direct financial support of ₹6,000 per year transferred directly to bank accounts of all landholding farmer families across Assam and India.",
+            badgeText = "PM-Kisan",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_pmsuryaghar",
+            name = "PM Surya Ghar Muft Bijli Yojana",
+            url = "https://pmsuryaghar.gov.in",
+            category = OpportunityCategory.MSME,
+            department = "Ministry of New & Renewable Energy",
+            description = "Free electricity scheme providing up to 300 units free power every month and direct capital subsidy up to ₹78,000 for rooftop solar installation.",
+            badgeText = "Surya Ghar",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_pmay_g",
+            name = "Pradhan Mantri Awaas Yojana - Gramin (PMAY-G)",
+            url = "https://pmayg.nic.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Ministry of Rural Development",
+            description = "Housing for all rural families: financial assistance of ₹1.30 Lakh directly to beneficiaries to construct pucca houses with toilet and drinking water.",
+            badgeText = "PMAY Gramin",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_pmay_u",
+            name = "Pradhan Mantri Awas Yojana - Urban (PMAY-U)",
+            url = "https://pmay-urban.gov.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Ministry of Housing & Urban Affairs",
+            description = "Affordable housing loan interest subsidy up to ₹2.67 Lakhs for EWS and LIG urban households to purchase or construct houses.",
+            badgeText = "PMAY Urban",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "assam_ayushman_asom",
+            name = "Ayushman Bharat & Mukhya Mantri Ayushman Asom",
+            url = "https://beneficiary.nha.gov.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Atal Amrit Abhiyan Society, Assam",
+            description = "Cashless medical treatment up to ₹5 Lakh per family per year across 30,000+ empanelled hospitals in India for all ration card holders.",
+            badgeText = "Ayushman Asom",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_rtps",
+            name = "Sewa Setu (Assam Right to Public Services RTPS)",
+            url = "https://rtps.assam.gov.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Administrative Reforms & Training Dept, Assam",
+            description = "Over 500+ government certificates and citizen services delivered within guaranteed time limits: PRC, Caste certificate, Income, Mutation, Trade License.",
+            badgeText = "Sewa Setu",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_basundhara",
+            name = "Mission Basundhara 3.0 Land Rights Portal",
+            url = "https://basundhara.assam.gov.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Revenue & Disaster Management, Assam",
+            description = "Settlement of land rights and distribution of permanent land pattas to indigenous and underprivileged families of Assam without middle-men.",
+            badgeText = "Basundhara",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_asrlm",
+            name = "Assam State Rural Livelihoods Mission (Lakhpati Baideu)",
+            url = "https://asrlm.assam.gov.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Panchayat & Rural Development, Assam",
+            description = "Empowering 40 Lakh Self-Help Group (SHG) women with ₹35,000 financial support and enterprise loans to become annual ₹1 Lakh earners.",
+            badgeText = "Lakhpati Baideu",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_cmaaa",
+            name = "Mukhya Mantri Atmanirbhar Asom Abhijan (CMAAA)",
+            url = "https://cmaaa.assam.gov.in",
+            category = OpportunityCategory.MSME,
+            department = "Department of Industries, Commerce & PE, Assam",
+            description = "Government financial assistance of ₹2 Lakhs (₹1L grant + ₹1L loan) to ₹5 Lakhs for 2 Lakh unemployed youths to establish self-employment businesses.",
+            badgeText = "CMAAA Asom",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_jjm",
+            name = "Jal Jeevan Mission Assam",
+            url = "https://jjmassam.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Public Health Engineering Dept, Assam",
+            description = "Har Ghar Jal initiative delivering functional household tap connections (FHTC) to every rural village home and hiring water testing technicians.",
+            badgeText = "Jal Jeevan",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_fishfed",
+            name = "Assam Fisheries Welfare & Aquaculture Schemes",
+            url = "https://fisheries.assam.gov.in",
+            category = OpportunityCategory.GOVERNMENT_SCHEME,
+            department = "Department of Fisheries, Assam",
+            description = "60% government subsidy for fish pond construction, biofloc units, fish seed, and motorized boats under Blue Revolution and PMMSY.",
+            badgeText = "Fisheries Asom",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_dairy",
+            name = "Directorate of Dairy Development Assam",
+            url = "https://dairy.assam.gov.in",
+            category = OpportunityCategory.GOVERNMENT_SCHEME,
+            department = "Animal Husbandry & Veterinary, Assam",
+            description = "Subsidy schemes for dairy farmers, high-yielding crossbred cows, mini dairy units, and automated milk collection center equipment.",
+            badgeText = "Dairy Asom",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_asdm",
+            name = "Assam Skill Development Mission (ASDM)",
+            url = "https://asdm.assam.gov.in",
+            category = OpportunityCategory.GOVERNMENT_JOB,
+            department = "Skill, Employment & Entrepreneurship Dept, Assam",
+            description = "Free skill training courses with food and transport allowance for youths in healthcare, solar technology, hospitality, apparel, and construction.",
+            badgeText = "ASDM Skill",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_skillx",
+            name = "Assam Employment Exchange (SkillX Portal)",
+            url = "https://skillx.assam.gov.in",
+            category = OpportunityCategory.GOVERNMENT_JOB,
+            department = "Directorate of Employment & Craftsmen Training, Assam",
+            description = "Mandatory Aadhaar-linked digital registration for Assam job seekers, employment exchange cards, and direct intimation for government job drives.",
+            badgeText = "Employment Exch",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "ne_mdoner",
+            name = "Ministry of Development of North Eastern Region (DoNER)",
+            url = "https://mdoner.gov.in",
+            category = OpportunityCategory.ASSAM,
+            department = "Ministry of DoNER, Government of India",
+            description = "Central schemes for 8 Northeast states: PM-DevINE, NESIDS infrastructure, livelihood grants, and regional development projects.",
+            badgeText = "DoNER India",
+            region = OpportunityRegion.NORTHEAST_INDIA
+        ),
+        OfficialPortalInfo(
+            id = "ne_nedfi",
+            name = "North Eastern Development Finance Corporation (NEDFi)",
+            url = "https://www.nedfi.com",
+            category = OpportunityCategory.MSME,
+            department = "NEDFi Financial Institution",
+            description = "Concessional business loans, micro-credit schemes, weaver grants, and startup venture funds for micro entrepreneurs in Northeast India.",
+            badgeText = "NEDFi Northeast",
+            region = OpportunityRegion.NORTHEAST_INDIA
+        ),
+        OfficialPortalInfo(
+            id = "ne_cbtc",
+            name = "Cane and Bamboo Technology Centre (CBTC)",
+            url = "https://cbtc.org.in",
+            category = OpportunityCategory.MSME,
+            department = "North Eastern Council (NEC)",
+            description = "Training, machinery subsidies, and export marketing support for bamboo and cane artisans and micro-enterprises in Northeast India.",
+            badgeText = "CBTC Bamboo",
+            region = OpportunityRegion.NORTHEAST_INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_ncs",
+            name = "National Career Service (NCS Portal)",
+            url = "https://www.ncs.gov.in",
+            category = OpportunityCategory.GOVERNMENT_JOB,
+            department = "Ministry of Labour and Employment",
+            description = "Pan-India job portal with over 15 Lakh verified active vacancies across government, defense, banking, and private sectors for 10th/12th/Graduates.",
+            badgeText = "NCS Jobs",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_pmmsy",
+            name = "Pradhan Mantri Matsya Sampada Yojana (PMMSY)",
+            url = "https://pmmsy.dof.gov.in",
+            category = OpportunityCategory.GOVERNMENT_SCHEME,
+            department = "Department of Fisheries, GoI",
+            description = "National fisheries scheme with 40% (General) and 60% (Women/SC/ST) subsidies for freshwater aquaculture, ornamental fish, and transport vans.",
+            badgeText = "PMMSY Fish",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_svanidhi",
+            name = "PM SVANidhi Street Vendor Micro-Credit",
+            url = "https://pmsvanidhi.mohua.gov.in",
+            category = OpportunityCategory.MSME,
+            department = "Ministry of Housing and Urban Affairs",
+            description = "Collateral-free working capital micro-loans of ₹10,000, ₹20,000, and ₹50,000 with 7% interest subsidy and cashback on digital transactions.",
+            badgeText = "PM SVANidhi",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_mudra",
+            name = "Pradhan Mantri MUDRA Yojana (PMMY)",
+            url = "https://www.mudra.org.in",
+            category = OpportunityCategory.MSME,
+            department = "Department of Financial Services",
+            description = "Collateral-free business loans for small enterprises: Shishu (up to ₹50,000), Kishore (up to ₹5 Lakh), and Tarun (up to ₹20 Lakhs).",
+            badgeText = "MUDRA Loan",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_standup",
+            name = "Stand-Up India Enterprise Loans",
+            url = "https://www.standupmitra.in",
+            category = OpportunityCategory.MSME,
+            department = "SIDBI / Ministry of Finance",
+            description = "Bank loans between ₹10 Lakhs and ₹1 Crore for at least one SC or ST borrower and at least one Woman borrower per bank branch.",
+            badgeText = "Stand-Up India",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "india_jan_aushadhi",
+            name = "Pradhan Mantri Bharatiya Janaushadhi Pariyojana",
+            url = "https://janaushadhi.gov.in",
+            category = OpportunityCategory.MSME,
+            department = "Pharmaceuticals & Medical Devices Bureau of India",
+            description = "50% to 90% discount on generic medicines for citizens, plus up to ₹5 Lakh government financial grant to open a PMBJK pharmacy store.",
+            badgeText = "Janaushadhi",
+            region = OpportunityRegion.INDIA
+        ),
+        OfficialPortalInfo(
+            id = "assam_ssa",
+            name = "Samagra Shiksha Assam",
+            url = "https://ssa.assam.gov.in",
+            category = OpportunityCategory.SCHOLARSHIP,
+            department = "Department of School Education, Assam",
+            description = "Free textbooks, school uniforms, mid-day meals, Gunotsav excellence awards, and teacher eligibility/recruitment portals.",
+            badgeText = "SSA Education",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_dme",
+            name = "Directorate of Medical Education Assam",
+            url = "https://dme.assam.gov.in",
+            category = OpportunityCategory.GOVERNMENT_JOB,
+            department = "Health & Family Welfare Dept, Assam",
+            description = "Official counselling and recruitment for GNM Nursing, Paramedical diploma courses, MBBS/BDS seats, and medical technician jobs.",
+            badgeText = "DME Medical",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "ne_iim_shillong",
+            name = "IIM Shillong Centre for Development of North East (CeDNER)",
+            url = "https://www.iimshillong.ac.in",
+            category = OpportunityCategory.MSME,
+            department = "IIM Shillong",
+            description = "Free management, entrepreneurship, and financial incubation programs specially designed for youth, startups, and artisans of Northeast India.",
+            badgeText = "IIM Shillong",
+            region = OpportunityRegion.NORTHEAST_INDIA
+        ),
+        OfficialPortalInfo(
+            id = "ne_nit_silchar",
+            name = "NIT Silchar Innovation & Incubation Centre",
+            url = "http://www.nits.ac.in",
+            category = OpportunityCategory.HACKATHON,
+            department = "National Institute of Technology Silchar",
+            description = "Seed funding, lab access, and mentorship for technology innovations, Agri-tech and green energy prototypes developed in the Northeast.",
+            badgeText = "NIT Silchar",
+            region = OpportunityRegion.ASSAM
+        ),
+        OfficialPortalInfo(
+            id = "assam_aasc",
+            name = "Assam Administrative Staff College",
+            url = "https://aasc.assam.gov.in",
+            category = OpportunityCategory.GOVERNMENT_JOB,
+            department = "Administrative Reforms, Assam",
+            description = "Premier training institute for civil services, offering public governance resources, administrative notifications, and civil servant guidance.",
+            badgeText = "Staff College",
+            region = OpportunityRegion.ASSAM
         )
     )
 

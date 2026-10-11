@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Category
@@ -39,6 +40,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -268,8 +270,26 @@ fun OpportunityDetailScreen(
                     }
                 }
 
-                // Official Source Link Action
+                // 1-Tap Generate & Auto-Publish Directly to Facebook
                 Button(
+                    onClick = {
+                        viewModel.generateContentForOpportunity(
+                            opportunity = opportunity,
+                            autoPublishImmediately = true
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_detail_generate_post"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("⚡ Generate & Post Directly to Facebook")
+                }
+
+                // Official Source Link Action
+                OutlinedButton(
                     onClick = {
                         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(opportunity.sourceUrl))
                         context.startActivity(browserIntent)

@@ -23,8 +23,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Refresh
@@ -1127,46 +1129,43 @@ fun GeneratorScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Duplicate Prevention Warning Banner
+                // Status banner for selected opportunity
                 if (isSelectedAlreadyPosted && selectedContentType != ContentType.MEME_POST) {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFEF2F2)),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth().testTag("banner_already_posted_warning")
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "⚠️ এই সুযোগৰ পোষ্ট ইতিমধ্যে তৈয়াৰ কৰা হৈছে! (ALREADY POSTED)",
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF991B1B),
-                                style = MaterialTheme.typography.titleSmall
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয় (No duplicate posts allowed). অনুগ্ৰহ কৰি আন এটা নতুন বা পোষ্ট নকৰা সুযোগ বাছক:",
-                                color = Color(0xFF7F1D1D),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = {
-                                    val nextUnposted = freshSarkariList.firstOrNull()
-                                        ?: opportunities.firstOrNull { !it.isPosted && !postedOpportunityIds.contains(it.id) }
-                                    if (nextUnposted != null) {
-                                        selectedOpportunity = nextUnposted
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("👉 বাছক নতুন ৪৮ ঘণ্টীয়া চৰকাৰী সুযোগ")
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "📌 পূৰ্বতে এই সুযোগ অন্তৰ্ভুক্ত কৰা হৈছে (Active in Catalog)",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Text(
+                                    text = "তলৰ বুটামটোত ক্লিক কৰিলে নতুন আপডেট বেনাৰ আৰু তথ্য প্ৰস্তুত হৈ পোনপটীয়াকৈ ফেচবুকত প্ৰকাশিত হ'ব (Fresh Update will be Generated & Published Directly to Facebook).",
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
-                // Action Button: GENERATE DRAFT
+                // Action Button: GENERATE & AUTO-POST DIRECTLY
                 Button(
                     onClick = {
                         val langParam = when {
@@ -1184,9 +1183,7 @@ fun GeneratorScreen(
                                 )
                             val format = selectedMemeFormat
                             viewModel.generateMeme(topic, format) { success ->
-                                if (success) {
-                                    onNavigateToQueue()
-                                }
+                                // Generated and recorded
                             }
                         } else {
                             selectedOpportunity?.let { opp ->
@@ -1196,40 +1193,37 @@ fun GeneratorScreen(
                                     platform = selectedPlatform,
                                     length = selectedLength,
                                     imageSize = selectedImageSize,
-                                    language = langParam
+                                    language = langParam,
+                                    autoPublishImmediately = true
                                 ) { success ->
-                                    if (success) {
-                                        onNavigateToQueue()
-                                    }
+                                    // Successfully generated and published directly to Facebook!
                                 }
                             }
                         }
                     },
-                    enabled = !isGenerating && (!isSelectedAlreadyPosted || selectedContentType == ContentType.MEME_POST) && (selectedOpportunity != null || selectedContentType == ContentType.MEME_POST),
+                    enabled = !isGenerating && (selectedOpportunity != null || selectedContentType == ContentType.MEME_POST),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(52.dp)
                         .testTag("generate_draft_button")
                 ) {
                     if (isGenerating) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("পোষ্ট আৰু ফটো প্ৰস্তুত হৈ আছে...")
-                    } else if (isSelectedAlreadyPosted && selectedContentType != ContentType.MEME_POST) {
-                        Text("⚠️ ইতিমধ্যে পোষ্ট কৰা হ'ল (ALREADY POSTED)")
+                        Text("পোষ্ট প্ৰস্তুত হৈ পোনপটীয়াকৈ ফেচবুকত প্ৰকাশ হৈ আছে...")
                     } else {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         val btnLabel = if (selectedContentType == ContentType.MEME_POST) {
-                            "GENERATE MEME POST & ALL 4 SIZES"
+                            "⚡ GENERATE & AUTO-POST MEME TO FACEBOOK"
                         } else {
-                            "GENERATE ${selectedContentType.displayName.uppercase()} ($selectedLanguage)"
+                            "⚡ GENERATE & DIRECTLY POST TO FACEBOOK ($selectedLanguage)"
                         }
-                        Text(btnLabel)
+                        Text(btnLabel, fontWeight = FontWeight.Bold)
                     }
                 }
 

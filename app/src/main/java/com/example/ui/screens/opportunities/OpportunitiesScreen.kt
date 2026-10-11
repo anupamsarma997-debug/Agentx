@@ -679,27 +679,18 @@ fun OpportunityCard(
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (isAlreadyPosted) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest
-                        ) {
-                            Text(
-                                text = "✓ ইতিমধ্যে প্ৰস্তুত",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        }
-                    } else if (onGeneratePost != null) {
+                    if (onGeneratePost != null) {
                         FilledTonalButton(
                             onClick = onGeneratePost,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.testTag("btn_quick_create_${opportunity.id}")
                         ) {
-                            Text("⚡ পোষ্ট বনাওক", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = if (isAlreadyPosted) "⚡ নতুন পোষ্ট" else "⚡ পোষ্ট বনাওক",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 

@@ -132,6 +132,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val database = AppDatabase.getInstance(application.applicationContext)
     val opportunityDao = database.opportunityDao()
     val contentDao = database.contentDao()
+    val postedContentTrackerDao = database.postedContentTrackerDao()
 
     val scoutEngine = OpportunityScoutEngine(
         dao = opportunityDao,
@@ -529,18 +530,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         length: ContentLength = ContentLength.SHORT,
         imageSize: PostImageSize = PostImageSize.SQUARE,
         language: String = "ASSAMESE",
+        autoPublishImmediately: Boolean = true,
         onComplete: ((Boolean) -> Unit)? = null
     ) {
         val s = settings.value
         viewModelScope.launch {
-            // Anti-duplication check: Avoid generating multiple posts for the same opportunity
-            val alreadyGenerated = contentDao.hasContentForOpportunity(opportunity.id)
-            if (alreadyGenerated || opportunity.isPosted) {
-                showMessage("⚠️ এই সুযোগৰ বাবে ইতিমধ্যে পোষ্ট প্ৰস্তুত কৰা হৈছে! একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয়। (Post already created for this opportunity! Duplicate generation prevented.)")
-                onComplete?.invoke(false)
-                return@launch
-            }
-
             val decision = freeTierGuard.canGeneratePost(s)
             if (decision is GenerationDecision.QuotaExhausted) {
                 // Auto-extend daily quota for explicit user action so generation is never blocked
@@ -559,7 +553,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     platform = platform,
                     length = length,
                     imageSize = imageSize,
-                    language = language
+                    language = language,
+                    forceRegenerate = true
                 )
 
                 when (outcome) {
@@ -568,13 +563,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         try {
                             opportunityDao.markAsPosted(opportunity.id)
                         } catch (_: Exception) {}
-                        val statusText = if (outcome.initialStatus == GenerationStatus.REVIEW_REQUIRED) {
-                            "Draft created in REVIEW REQUIRED (needs manual approval)."
+
+                        val contentItem = (outcome.contentId?.let { contentDao.getContentByIdSync(it) })
+                            ?: contentDao.getLatestContentByOpportunitySync(opportunity.id)
+
+                        if (contentItem != null && autoPublishImmediately) {
+                            showMessage("🚀 পোষ্ট প্ৰস্তুত হ'ল! পোনপটীয়াকৈ ফেচবুকত প্ৰকাশ কৰা হৈছে... (Publishing directly to Facebook...)")
+                            publishPostImmediately(contentItem) { pubSuccess, pubMsg ->
+                                if (pubSuccess) {
+                                    showMessage("🎉 পোষ্ট সফলতাৰে প্ৰস্তুত হৈ ফেচবুকত পোনপটীয়াকৈ প্ৰকাশিত হ'ল! (Post Generated & Directly Published to Facebook!)")
+                                } else {
+                                    showMessage("পোষ্ট প্ৰস্তুত হৈছে: $pubMsg")
+                                }
+                                onComplete?.invoke(pubSuccess)
+                            }
                         } else {
-                            "Draft created in GENERATED state."
+                            showMessage("পোষ্ট সফলতাৰে প্ৰস্তুত হ'ল! (Content generated successfully)")
+                            onComplete?.invoke(true)
                         }
-                        showMessage("Content generated successfully! $statusText")
-                        onComplete?.invoke(true)
                     }
                     is ContentCreationOutcome.ConfigurationRequired -> {
                         showMessage(outcome.message)
@@ -694,33 +700,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     else -> list
                 }.ifEmpty { if (categoryFilter == "MEMES") emptyList() else list }
 
-                // Strict Anti-Duplication: Do not re-generate opportunities that already have a post
+                // Prepare target list for batch generation
                 val existingGeneratedIds = contentDao.getAllContentSync().map { it.sourceOpportunityId }.toSet()
-                val unpostedTargetList = targetList.filter { opp ->
+                val unpostedList = targetList.filter { opp ->
                     !opp.isPosted && opp.id !in existingGeneratedIds
                 }
+                val batchList = if (unpostedList.isNotEmpty()) unpostedList else targetList.take(15)
 
-                if (unpostedTargetList.isEmpty() && categoryFilter != "MEMES") {
-                    batchProgressText.value = "সকলো পোষ্ট ইতিমধ্যে বনোৱা হৈছে"
-                    showMessage("এই শ্ৰেণীৰ সকলো সুযোগৰ পোষ্ট ইতিমধ্যে তৈয়াৰ কৰা হৈছে! একেটা পোষ্ট বাৰে বাৰে বনোৱা নহয়। (All selected opportunities already have posts! No duplicates generated.)")
+                if (batchList.isEmpty() && categoryFilter != "MEMES") {
+                    batchProgressText.value = "প্ৰস্তুত কৰিবলৈ সুযোগ পোৱা নগ'ল"
+                    showMessage("প্ৰস্তুত কৰিবলৈ কোনো সুযোগ পোৱা নগ'ল। (No opportunities available to generate.)")
                     isBatchGenerating.value = false
                     onComplete?.invoke(0)
                     return@launch
                 }
 
                 val s = settings.value
-                val plannedQuota = if (categoryFilter == "MEMES") 5 else unpostedTargetList.size + 15
+                val plannedQuota = if (categoryFilter == "MEMES") 5 else batchList.size + 15
                 settingsRepository.setDailyTargets(
                     maxOf(s.dailyPostTarget + plannedQuota, s.todayPostCount + plannedQuota),
                     s.dailyReelTarget
                 )
 
                 var successCount = 0
-                val total = unpostedTargetList.size
+                val total = batchList.size
 
-                for ((index, opp) in unpostedTargetList.withIndex()) {
+                for ((index, opp) in batchList.withIndex()) {
                     batchProgressRatio.value = ((index + 1).toFloat() / total.toFloat()).coerceIn(0.05f, 0.98f)
-                    batchProgressText.value = "প্ৰস্তুত হৈ আছে (${index + 1}/$total): ${opp.title}"
+                    batchProgressText.value = "প্ৰস্তুত আৰু ফেচবুকত পোনপটীয়াকৈ পোষ্ট হৈ আছে (${index + 1}/$total): ${opp.title}"
 
                     val contentType = when {
                         opp.title.contains("Police", ignoreCase = true) ||
@@ -754,7 +761,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             platform = ContentPlatform.BOTH,
                             length = ContentLength.MEDIUM,
                             imageSize = PostImageSize.SQUARE,
-                            language = language
+                            language = language,
+                            forceRegenerate = true
                         )
                         if (outcome is ContentCreationOutcome.Success) {
                             settingsRepository.incrementTodayPostCount()
@@ -762,6 +770,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 opportunityDao.markAsPosted(opp.id)
                             } catch (_: Exception) {}
                             successCount++
+
+                            // Direct auto-publish as requested: "Ek bar generate hone k bad sidha post hona jahiye"
+                            val newItem = outcome.contentId?.let { contentDao.getContentByIdSync(it) }
+                                ?: contentDao.getLatestContentByOpportunitySync(opp.id)
+                            if (newItem != null) {
+                                try {
+                                    publishPostImmediately(newItem)
+                                } catch (_: Exception) {}
+                            }
                         }
                     } catch (e: Exception) {
                         AppLogger.warn("BatchGen", "ItemFail", "Failed to generate for ${opp.title}: ${e.message}")
@@ -2023,6 +2040,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
+            // Fingerprint check via Room posted content tracker to prevent duplicate social media publishing
+            val fingerprint = "${item.title.trim().lowercase()}_${item.body.take(100).trim().lowercase()}"
+            if (postedContentTrackerDao.isFingerprintPosted(fingerprint)) {
+                val duplicateMsg = "⚠️ এই পোষ্টৰ একেটা বিষয়বস্তু ইতিমধ্যে ফেচবুকত প্ৰকাশ কৰা হৈছে (Duplicate social media post prevented)."
+                showMessage(duplicateMsg)
+                AppLogger.warn("Meta", "Publish", duplicateMsg)
+                onComplete(false, duplicateMsg)
+                return@launch
+            }
+
             // Ensure Meta Facebook connection is active from persistent storage
             if (!metaConnection.value.isFacebookConnected && metaConnectionRepository.hasSavedConnection()) {
                 metaConnectionRepository.restoreSavedConnection()
@@ -2087,6 +2114,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (fbPostId != null) {
                 contentDao.updateFacebookPublished(item.id, fbPostId)
                 contentDao.updateStatus(item.id, GenerationStatus.PUBLISHED.name)
+
+                // Track in Room posted content database to guarantee same content isn't published twice
+                try {
+                    postedContentTrackerDao.insert(
+                        com.example.data.local.entity.PostedContentTrackerEntity(
+                            id = java.util.UUID.randomUUID().toString(),
+                            opportunityId = item.sourceOpportunityId,
+                            contentUrl = item.sourceUrl.takeIf { it.isNotBlank() },
+                            contentFingerprint = fingerprint,
+                            title = item.title,
+                            socialPlatform = "FACEBOOK",
+                            socialPostId = fbPostId,
+                            publishedAt = System.currentTimeMillis(),
+                            status = "PUBLISHED"
+                        )
+                    )
+                } catch (_: Exception) {}
+
                 val successMsg = "Successfully published to Facebook Page (${page.pageName})! (Post ID: $fbPostId)"
                 AppLogger.info("Meta", "Publish", successMsg)
                 showMessage(successMsg)
