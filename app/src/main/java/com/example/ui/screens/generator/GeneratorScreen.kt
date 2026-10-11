@@ -759,13 +759,22 @@ fun GeneratorScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    val allCount = OfficialPortalDirectory.ALL_PORTALS.size
+                    val assamCount = OfficialPortalDirectory.ALL_PORTALS.count { it.region == OpportunityRegion.ASSAM || it.category == OpportunityCategory.ASSAM }
+                    val welfareCount = OfficialPortalDirectory.ALL_PORTALS.count { it.category == OpportunityCategory.GOVERNMENT_SCHEME || it.category == OpportunityCategory.ASSAM }
+                    val msmeCount = OfficialPortalDirectory.ALL_PORTALS.count { it.category == OpportunityCategory.MSME }
+                    val jobCount = OfficialPortalDirectory.ALL_PORTALS.count { it.category == OpportunityCategory.GOVERNMENT_JOB }
+                    val hackathonCount = OfficialPortalDirectory.ALL_PORTALS.count { it.category == OpportunityCategory.HACKATHON || it.category == OpportunityCategory.INTERNSHIP }
+                    val scholarshipCount = OfficialPortalDirectory.ALL_PORTALS.count { it.category == OpportunityCategory.SCHOLARSHIP }
+
                     listOf(
-                        "ALL" to "All (১০৪)",
-                        "ASSAM" to "🏛️ অসম (৩৭)",
-                        "MSME" to "🏢 MSME (১৮)",
-                        "JOB" to "🛡️ চাকৰি (১৮)",
-                        "HACKATHON" to "💻 হেকাথন (১৬)",
-                        "SCHOLARSHIP" to "🎓 বৃত্তি (১৫)"
+                        "ALL" to "All ($allCount)",
+                        "ASSAM" to "🏛️ অসম ($assamCount)",
+                        "WELFARE" to "🌾 জনকল্যাণ ($welfareCount)",
+                        "MSME" to "🏢 MSME ($msmeCount)",
+                        "JOB" to "🛡️ চাকৰি ($jobCount)",
+                        "HACKATHON" to "💻 হেকাথন ($hackathonCount)",
+                        "SCHOLARSHIP" to "🎓 বৃত্তি ($scholarshipCount)"
                     ).forEach { (catKey, catLabel) ->
                         FilterChip(
                             selected = selectedWebsiteCategory == catKey,
@@ -779,7 +788,7 @@ fun GeneratorScreen(
                 OutlinedTextField(
                     value = websiteSearchQuery,
                     onValueChange = { websiteSearchQuery = it },
-                    placeholder = { Text("Search 100+ websites (e.g. slprb, sih, kvic, nehu, isro)...") },
+                    placeholder = { Text("Search 130+ websites (e.g. ration, eshram, kisan, surya, slprb, sih, nedfi)...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().testTag("input_search_websites")
                 )
@@ -790,6 +799,7 @@ fun GeneratorScreen(
                     if (selectedWebsiteCategory != "ALL") {
                         list = when (selectedWebsiteCategory) {
                             "ASSAM" -> list.filter { it.region == OpportunityRegion.ASSAM || it.category == OpportunityCategory.ASSAM }
+                            "WELFARE" -> list.filter { it.category == OpportunityCategory.GOVERNMENT_SCHEME || it.category == OpportunityCategory.ASSAM }
                             "MSME" -> list.filter { it.category == OpportunityCategory.MSME }
                             "JOB" -> list.filter { it.category == OpportunityCategory.GOVERNMENT_JOB }
                             "HACKATHON" -> list.filter { it.category == OpportunityCategory.HACKATHON || it.category == OpportunityCategory.INTERNSHIP }
