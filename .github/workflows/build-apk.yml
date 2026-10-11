@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   build:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -24,15 +25,17 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Accept Android SDK Licenses
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          yes | sdkmanager --licenses 2>/dev/null || true
 
       - name: Grant execute permission for gradlew
-        run: chmod +x gradlew || true
+        run: |
+          sed -i 's/\r$//' gradlew || true
+          chmod +x gradlew
 
       - name: Restore debug.keystore from base64
         run: |
@@ -58,10 +61,14 @@ jobs:
           if [ -n "$GEMINI_API_KEY" ]; then
             sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=$GEMINI_API_KEY|" .env || echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
           fi
+          if [ -n "$META_APP_ID" ]; then
+            sed -i "s|^META_APP_ID=.*|META_APP_ID=$META_APP_ID|" .env || echo "META_APP_ID=$META_APP_ID" >> .env
+          fi
+          if [ -n "$META_REDIRECT_URI" ]; then
+            sed -i "s|^META_REDIRECT_URI=.*|META_REDIRECT_URI=$META_REDIRECT_URI|" .env || echo "META_REDIRECT_URI=$META_REDIRECT_URI" >> .env
+          fi
 
       - name: Build Debug APK
-        env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8"
         run: |
           ./gradlew assembleDebug --stacktrace --no-daemon --no-configuration-cache
 
@@ -69,7 +76,6 @@ jobs:
         run: |
           mkdir -p build-artifacts
           cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/SocialAgent.apk
-          cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/SocialAgent-Latest.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -87,12 +93,12 @@ jobs:
           name: "SocialAgent Latest APK"
           body: |
             ## 📱 SocialAgent - Latest Android APK
-            
-            Directly download the APK file below and install on your Android device:
-            - **SocialAgent.apk**: Direct installable Android application package.
-            
+
+            Download and install the APK directly on your Android phone:
+            - **SocialAgent.apk**
+
             ### ✨ Features:
-            - Instant Post Generation & Direct Publishing
+            - Instant Post Generation & One-Tap Sharing
             - 130+ Assam & Northeast Citizen Portals & Schemes
             - Anti-duplication tracking with Room Database
           files: build-artifacts/SocialAgent.apk
