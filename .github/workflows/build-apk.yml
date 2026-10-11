@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,20 +24,17 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew || true
 
-      - name: Restore debug.keystore from base64 if present
+      - name: Restore debug.keystore from base64
         run: |
           if [ -f "debug.keystore.base64" ]; then
             base64 -d debug.keystore.base64 > debug.keystore
@@ -48,32 +48,39 @@ jobs:
           META_APP_ID: ${{ secrets.META_APP_ID }}
           META_REDIRECT_URI: ${{ secrets.META_REDIRECT_URI }}
         run: |
-          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
-            cp .env.example .env
+          if [ ! -f ".env" ]; then
+            if [ -f ".env.example" ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
           fi
           if [ -n "$GEMINI_API_KEY" ]; then
             sed -i "s|^GEMINI_API_KEY=.*|GEMINI_API_KEY=$GEMINI_API_KEY|" .env || echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
           fi
 
       - name: Build Debug APK
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8"
         run: |
-          ./gradlew assembleDebug --stacktrace --no-daemon
+          ./gradlew assembleDebug --stacktrace --no-daemon --no-configuration-cache
 
-      - name: Rename APK for Easy Identification
+      - name: Prepare APK Artifacts
         run: |
           mkdir -p build-artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/SocialAgent-Latest.apk
           cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/SocialAgent.apk
+          cp app/build/outputs/apk/debug/app-debug.apk build-artifacts/SocialAgent-Latest.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: SocialAgent-APK
-          path: build-artifacts/SocialAgent-Latest.apk
+          path: build-artifacts/SocialAgent.apk
           retention-days: 30
 
       - name: Create or Update GitHub Release with APK
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
@@ -81,7 +88,7 @@ jobs:
           body: |
             ## 📱 SocialAgent - Latest Android APK
             
-            Directly download the latest APK below and install on your Android device:
+            Directly download the APK file below and install on your Android device:
             - **SocialAgent.apk**: Direct installable Android application package.
             
             ### ✨ Features:
