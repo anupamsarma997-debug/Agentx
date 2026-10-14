@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.PostAdd
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Public
@@ -75,6 +76,7 @@ fun SettingsScreen(
     val metaConnection by viewModel.metaConnection.collectAsState()
     val authState by viewModel.authState.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
+    val isNotificationDeliveredToday by viewModel.isDailyNotificationDeliveredToday.collectAsState()
     val scrollState = rememberScrollState()
 
     var showTimeDialog by remember { mutableStateOf(false) }
@@ -512,6 +514,177 @@ fun SettingsScreen(
                         onCheckedChange = { viewModel.setAutomationEnabled(it) },
                         modifier = Modifier.testTag("settings_automation_switch")
                     )
+                }
+            }
+        }
+
+        // 🔔 DAILY PUSH NOTIFICATION (DAILY TOP 10 DIGEST) Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings_daily_notification_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.NotificationsActive,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "DAILY PUSH NOTIFICATION",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "দিনৰ শীৰ্ষ ১০ টা ডাঙৰ খবৰৰ দৈনিক নটিফিকেচন (Top 10 Big News)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = settings.dailyNewsNotificationEnabled,
+                        onCheckedChange = {
+                            viewModel.updateDailyNotificationSettings(
+                                enabled = it,
+                                hour = settings.dailyNotificationHour,
+                                minute = settings.dailyNotificationMinute
+                            )
+                        },
+                        modifier = Modifier.testTag("switch_daily_news_notification")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Schedule time display
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "নটিফিকেচনৰ সময় (Daily Trigger Time)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "প্ৰতিদিনে পুৱা ${String.format("%02d:%02d", settings.dailyNotificationHour, settings.dailyNotificationMinute)} বজাত (09:00 AM Daily)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "09:00 AM",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Anti-Spam Rate-Limiting Protection Badge
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFFF0FDF4),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = Color(0xFF16A34A),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "🛡️ Anti-Spam Guard Active (Strictly Once Per Day)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF15803D)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "পুনৰাবৃত্তিমূলক বা অত্যাধিক এলাৰ্ট ৰোধ কৰিবলৈ ২৪ ঘণ্টাত কেৱল ১ বাৰহে পুশ নটিফিকেচন প্ৰেৰণ কৰা হয়।",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF166534)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Delivery Status for Today
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "আজিৰ স্থিতি (Today's Delivery):",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isNotificationDeliveredToday) Color(0xFFDCFCE7) else Color(0xFFFEF3C7)
+                    ) {
+                        Text(
+                            text = if (isNotificationDeliveredToday) "✅ Delivered Today (পালে)" else "⏳ Scheduled for 09:00 AM",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isNotificationDeliveredToday) Color(0xFF166534) else Color(0xFF92400E)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Test preview button
+                Button(
+                    onClick = { viewModel.triggerTestDailyNotification() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_test_daily_notification"),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.NotificationsActive, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("🔔 নটিফিকেচন পৰীক্ষা কৰক (Test Safe Notification Preview)", fontWeight = FontWeight.Bold)
                 }
             }
         }

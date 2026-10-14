@@ -9,6 +9,9 @@ import com.example.data.remote.ai.AIResult
 import com.example.data.remote.ai.GeminiClient
 import com.example.domain.model.GeneratedContentResult
 import com.example.domain.model.SourceFact
+import com.example.domain.verification.SourceRiskLevel
+import com.example.domain.verification.SourceVerificationResult
+import com.example.domain.verification.SourceVerificationService
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -21,14 +24,16 @@ sealed interface ContentCreationOutcome {
     data class Success(
         val result: GeneratedContentResult,
         val initialStatus: GenerationStatus,
-        val contentId: String? = null
+        val contentId: String? = null,
+        val verificationResult: SourceVerificationResult? = null
     ) : ContentCreationOutcome
     data class ConfigurationRequired(val message: String) : ContentCreationOutcome
     data class Error(val message: String) : ContentCreationOutcome
 }
 
 class ContentCreationEngine(
-    private val geminiClient: GeminiClient = GeminiClient()
+    private val geminiClient: GeminiClient = GeminiClient(),
+    val sourceVerificationService: SourceVerificationService = SourceVerificationService(geminiClient)
 ) {
 
     /**
@@ -177,11 +182,41 @@ class ContentCreationEngine(
             return ContentCreationOutcome.Error(gate.reason)
         }
 
+        // 1. Execute 'Source Verification' service using Google Search grounding
+        // Cross-references news URLs with official government or primary domains before generating content
+        val verificationResult = sourceVerificationService.verifySource(
+            url = fact.sourceUrl,
+            title = fact.title,
+            sourceName = fact.sourceName,
+            description = fact.description,
+            deadline = fact.deadline
+        )
+
+        // If source verification detected an expired deadline or suspicious unverified notice, block generation
+        if (verificationResult.riskLevel == com.example.domain.verification.SourceRiskLevel.SUSPICIOUS_OR_EXPIRED) {
+            return ContentCreationOutcome.Error("Publication blocked: ${verificationResult.verificationSummary}")
+        }
+
+        // If cross-referencing found a canonical official government domain, prioritize it!
+        val effectiveFact = if (verificationResult.canonicalOfficialUrl.isNotBlank() &&
+            (verificationResult.isGovernmentDomain || verificationResult.isVerified) &&
+            verificationResult.canonicalOfficialUrl != fact.sourceUrl
+        ) {
+            fact.copy(
+                sourceUrl = verificationResult.canonicalOfficialUrl,
+                organization = verificationResult.officialAuthority ?: fact.organization,
+                sourceName = verificationResult.officialAuthority ?: fact.sourceName,
+                verificationStatus = VerificationStatus.VERIFIED.name
+            )
+        } else {
+            fact
+        }
+
         // Fetch live source page text via HTTP GET with 8s timeout to ensure factual grounded generation
-        val liveSourceText = geminiClient.fetchLiveSourcePageText(fact.sourceUrl)
+        val liveSourceText = geminiClient.fetchLiveSourcePageText(effectiveFact.sourceUrl)
 
         val systemPrompt = buildSystemPrompt(contentType, platform, length, language)
-        val userPrompt = buildUserPrompt(fact, liveSourceText)
+        val userPrompt = buildUserPrompt(effectiveFact, liveSourceText)
 
         // Attempt 1: Standard generation
         var aiResult = geminiClient.generateContent(systemPrompt, userPrompt)
@@ -189,9 +224,9 @@ class ContentCreationEngine(
         if (aiResult is AIResult.Success) {
             val firstTryValidation = validateAndParseResponse(
                 rawJson = aiResult.jsonText,
-                expectedSourceUrl = fact.sourceUrl,
-                expectedSourceName = fact.sourceName,
-                expectedDeadline = fact.deadline,
+                expectedSourceUrl = effectiveFact.sourceUrl,
+                expectedSourceName = effectiveFact.sourceName,
+                expectedDeadline = effectiveFact.deadline,
                 expectedContentType = contentType,
                 expectedPlatform = platform,
                 liveSourceText = liveSourceText
@@ -199,7 +234,11 @@ class ContentCreationEngine(
 
             if (firstTryValidation.isSuccess) {
                 val initialStatus = resolveInitialStatus(verificationStatus)
-                return ContentCreationOutcome.Success(firstTryValidation.getOrThrow(), initialStatus)
+                return ContentCreationOutcome.Success(
+                    result = firstTryValidation.getOrThrow(),
+                    initialStatus = initialStatus,
+                    verificationResult = verificationResult
+                )
             }
 
             // If truncated or malformed, attempt one automatic retry with strict anti-truncation prompt
@@ -277,8 +316,8 @@ class ContentCreationEngine(
                     body = fallbackBody,
                     caption = fallbackCaption,
                     hashtags = fallbackHashtags,
-                    sourceUrl = fact.sourceUrl,
-                    sourceName = fact.sourceName,
+                    sourceUrl = effectiveFact.sourceUrl,
+                    sourceName = effectiveFact.sourceName,
                     contentType = contentType,
                     platform = platform,
                     confidence = "HIGH",
@@ -286,14 +325,18 @@ class ContentCreationEngine(
                     rawJson = "{}"
                 )
                 val initialStatus = resolveInitialStatus(verificationStatus)
-                ContentCreationOutcome.Success(fallbackResult, initialStatus)
+                ContentCreationOutcome.Success(
+                    result = fallbackResult,
+                    initialStatus = initialStatus,
+                    verificationResult = verificationResult
+                )
             }
             is AIResult.Success -> {
                 val validation = validateAndParseResponse(
                     rawJson = aiResult.jsonText,
-                    expectedSourceUrl = fact.sourceUrl,
-                    expectedSourceName = fact.sourceName,
-                    expectedDeadline = fact.deadline,
+                    expectedSourceUrl = effectiveFact.sourceUrl,
+                    expectedSourceName = effectiveFact.sourceName,
+                    expectedDeadline = effectiveFact.deadline,
                     expectedContentType = contentType,
                     expectedPlatform = platform,
                     liveSourceText = liveSourceText
@@ -301,26 +344,34 @@ class ContentCreationEngine(
 
                 if (validation.isSuccess) {
                     val initialStatus = resolveInitialStatus(verificationStatus)
-                    ContentCreationOutcome.Success(validation.getOrThrow(), initialStatus)
+                    ContentCreationOutcome.Success(
+                        result = validation.getOrThrow(),
+                        initialStatus = initialStatus,
+                        verificationResult = verificationResult
+                    )
                 } else {
                     val fallbackResult = GeneratedContentResult(
                         title = fact.title,
                         body = if (isAssameseMode) {
-                            "📢 ${fact.title}\n\n${fact.description}\n\n🎯 কি কি যোগ্যতা লাগিব: ${fact.eligibility ?: "অফিচিয়েল ৱেবচাইটত চাওক"}\n⏰ অন্তিম তাৰিখ: ${fact.deadline ?: "অফিচিয়েল ৱেবচাইটত চাওক"}\n🔗 ক'ত আবেদন কৰিব: ${fact.sourceUrl}"
+                            "📢 ${fact.title}\n\n${fact.description}\n\n🎯 কি কি যোগ্যতা লাগিব: ${fact.eligibility ?: "অফিচিয়েল ৱেবচাইটত চাওক"}\n⏰ অন্তিম তাৰিখ: ${fact.deadline ?: "অফিচিয়েল ৱেবচাইটত চাওক"}\n🔗 ক'ত আবেদন কৰিব: ${effectiveFact.sourceUrl}"
                         } else {
-                            "${fact.title}\n\n${fact.description}\n\nEligibility: ${fact.eligibility ?: "Details official site par dekhein"}\nDeadline: ${fact.deadline ?: "Details official site par dekhein"}\nOfficial Portal: ${fact.sourceUrl}"
+                            "${fact.title}\n\n${fact.description}\n\nEligibility: ${fact.eligibility ?: "Details official site par dekhein"}\nDeadline: ${fact.deadline ?: "Details official site par dekhein"}\nOfficial Portal: ${effectiveFact.sourceUrl}"
                         },
-                        caption = "${fact.title} - Apply at ${fact.sourceUrl}",
+                        caption = "${fact.title} - Apply at ${effectiveFact.sourceUrl}",
                         hashtags = if (isAssameseMode) listOf("#AssamGovt", "#অসম", "#AssamCareer") else listOf("#Opportunity", "#Career", "#Alert"),
-                        sourceUrl = fact.sourceUrl,
-                        sourceName = fact.sourceName,
+                        sourceUrl = effectiveFact.sourceUrl,
+                        sourceName = effectiveFact.sourceName,
                         contentType = contentType,
                         platform = platform,
                         confidence = "MEDIUM",
                         needsReview = true,
                         rawJson = "{}"
                     )
-                    ContentCreationOutcome.Success(fallbackResult, GenerationStatus.NEEDS_REVIEW)
+                    ContentCreationOutcome.Success(
+                        result = fallbackResult,
+                        initialStatus = GenerationStatus.REVIEW_REQUIRED,
+                        verificationResult = verificationResult
+                    )
                 }
             }
         }

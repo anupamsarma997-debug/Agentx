@@ -43,5 +43,14 @@ class SocialAgentApplication : Application() {
         } catch (e: Exception) {
             AppLogger.warn("AppCheck", "Startup", "App Check initialization warning: ${e.message}")
         }
+
+        // 4. Initialize Daily Top 10 Push Notification channel & schedule
+        try {
+            com.example.domain.notification.DailyTop10NewsNotificationManager.createNotificationChannel(this)
+            com.example.domain.notification.DailyTop10NewsNotificationManager.scheduleDailyAlarm(this, hour = 9, minute = 0)
+            AppLogger.info("Notification", "Init", "Daily Top 10 push notification channel and schedule armed")
+        } catch (e: Exception) {
+            AppLogger.warn("Notification", "InitError", "Notification setup warning: ${e.message}")
+        }
     }
 }

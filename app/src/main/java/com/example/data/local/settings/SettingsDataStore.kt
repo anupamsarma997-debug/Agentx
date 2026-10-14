@@ -24,8 +24,8 @@ data class AppSettings(
     val automationEndHour: Int = 11,
     val automationEndMinute: Int = 0,
     val timezone: String = "Asia/Kolkata",
-    val dailyPostTarget: Int = 50,
-    val dailyReelTarget: Int = 20,
+    val dailyPostTarget: Int = 8,
+    val dailyReelTarget: Int = 2,
     val todayPostCount: Int = 0,
     val todayReelCount: Int = 0,
     val lastCountDate: String = "",
@@ -34,7 +34,11 @@ data class AppSettings(
     val indiaOpportunities: Boolean = true,
     val internationalOpportunities: Boolean = false,
     val newsCollection: Boolean = true,
-    val customGeminiApiKey: String = ""
+    val customGeminiApiKey: String = "",
+    val dailyNewsNotificationEnabled: Boolean = true,
+    val dailyNotificationHour: Int = 9,
+    val dailyNotificationMinute: Int = 0,
+    val lastDailyNotificationDate: String = ""
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -58,6 +62,10 @@ class SettingsDataStore(private val context: Context) {
         val KEY_INTERNATIONAL_OPPORTUNITIES = booleanPreferencesKey("international_opportunities")
         val KEY_NEWS_COLLECTION = booleanPreferencesKey("news_collection")
         val KEY_CUSTOM_GEMINI_API_KEY = stringPreferencesKey("custom_gemini_api_key")
+        val KEY_DAILY_NEWS_NOTIFICATION_ENABLED = booleanPreferencesKey("daily_news_notification_enabled")
+        val KEY_DAILY_NOTIFICATION_HOUR = intPreferencesKey("daily_notification_hour")
+        val KEY_DAILY_NOTIFICATION_MINUTE = intPreferencesKey("daily_notification_minute")
+        val KEY_LAST_DAILY_NOTIFICATION_DATE = stringPreferencesKey("last_daily_notification_date")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -100,7 +108,11 @@ class SettingsDataStore(private val context: Context) {
                 indiaOpportunities = prefs[KEY_INDIA_OPPORTUNITIES] ?: true,
                 internationalOpportunities = prefs[KEY_INTERNATIONAL_OPPORTUNITIES] ?: false,
                 newsCollection = prefs[KEY_NEWS_COLLECTION] ?: true,
-                customGeminiApiKey = prefs[KEY_CUSTOM_GEMINI_API_KEY] ?: ""
+                customGeminiApiKey = prefs[KEY_CUSTOM_GEMINI_API_KEY] ?: "",
+                dailyNewsNotificationEnabled = prefs[KEY_DAILY_NEWS_NOTIFICATION_ENABLED] ?: true,
+                dailyNotificationHour = prefs[KEY_DAILY_NOTIFICATION_HOUR] ?: 9,
+                dailyNotificationMinute = prefs[KEY_DAILY_NOTIFICATION_MINUTE] ?: 0,
+                lastDailyNotificationDate = prefs[KEY_LAST_DAILY_NOTIFICATION_DATE] ?: ""
             )
         }
 
@@ -204,6 +216,20 @@ class SettingsDataStore(private val context: Context) {
     suspend fun updateCustomGeminiApiKey(key: String) {
         context.dataStore.edit { prefs ->
             prefs[KEY_CUSTOM_GEMINI_API_KEY] = key.trim()
+        }
+    }
+
+    suspend fun updateDailyNotificationSettings(enabled: Boolean, hour: Int, minute: Int) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_DAILY_NEWS_NOTIFICATION_ENABLED] = enabled
+            prefs[KEY_DAILY_NOTIFICATION_HOUR] = hour
+            prefs[KEY_DAILY_NOTIFICATION_MINUTE] = minute
+        }
+    }
+
+    suspend fun markDailyNotificationDelivered(dateKey: String) {
+        context.dataStore.edit { prefs ->
+            prefs[KEY_LAST_DAILY_NOTIFICATION_DATE] = dateKey
         }
     }
 }

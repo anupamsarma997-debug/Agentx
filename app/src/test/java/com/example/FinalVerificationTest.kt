@@ -51,7 +51,7 @@ class FinalVerificationTest {
         sourceName: String = "SLPRB Assam",
         sourceUrl: String = "https://slprbassam.in/si-recruitment-2026",
         sourceDomain: String = "slprbassam.in",
-        deadline: String? = "2026-10-10",
+        deadline: String? = "2026-12-31",
         eligibility: String? = "Graduate degree, Age 20-26",
         organization: String? = "State Level Police Recruitment Board Assam",
         verificationStatus: String = VerificationStatus.VERIFIED.name
@@ -80,9 +80,9 @@ class FinalVerificationTest {
         val opp = createSampleOpportunity()
         val contentFact = GeneratedContentFact(
             title = "Assam Police Sub-Inspector Recruitment 2026",
-            body = "State Level Police Recruitment Board Assam has announced 500 SI vacancies. Eligibility: Graduate degree. Apply before 2026-10-10 at official portal.",
+            body = "State Level Police Recruitment Board Assam has announced 500 SI vacancies. Eligibility: Graduate degree. Apply before 2026-12-31 at official portal.",
             caption = "Official notice from SLPRB Assam: https://slprbassam.in/si-recruitment-2026 #AssamJobs",
-            deadline = "2026-10-10",
+            deadline = "2026-12-31",
             eligibility = "Graduate degree",
             organization = "State Level Police Recruitment Board Assam",
             sourceUrl = "https://slprbassam.in/si-recruitment-2026",
@@ -112,12 +112,12 @@ class FinalVerificationTest {
 
     @Test
     fun testMismatchedDeadlineFailsVerification() {
-        val opp = createSampleOpportunity(deadline = "2026-10-10")
+        val opp = createSampleOpportunity(deadline = "2026-12-20")
         val contentFact = GeneratedContentFact(
             title = "Assam Police Recruitment",
-            body = "Apply now before deadline 2026-10-15!", // Mismatched deadline
+            body = "Apply now before deadline 2026-12-25!", // Mismatched deadline
             caption = "Source: SLPRB Assam https://slprbassam.in/si-recruitment-2026",
-            deadline = "2026-10-15",
+            deadline = "2026-12-25",
             sourceUrl = "https://slprbassam.in/si-recruitment-2026"
         )
 

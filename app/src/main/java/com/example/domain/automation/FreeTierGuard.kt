@@ -25,12 +25,16 @@ class FreeTierGuard {
     }
 
     fun canGeneratePost(settings: AppSettings): GenerationDecision {
-        // Creator/admin always has unrestricted access to generate content
+        if (settings.freeMode && settings.todayPostCount >= settings.dailyPostTarget) {
+            return GenerationDecision.QuotaExhausted("Daily post target (${settings.dailyPostTarget}) reached.")
+        }
         return GenerationDecision.Allowed
     }
 
     fun canGenerateReel(settings: AppSettings): GenerationDecision {
-        // Creator/admin always has unrestricted access to generate reels
+        if (settings.freeMode && settings.todayReelCount >= settings.dailyReelTarget) {
+            return GenerationDecision.QuotaExhausted("Daily reel target (${settings.dailyReelTarget}) reached.")
+        }
         return GenerationDecision.Allowed
     }
 

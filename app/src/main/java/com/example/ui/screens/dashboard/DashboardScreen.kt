@@ -325,7 +325,193 @@ fun DashboardScreen(
                 ) {
                     Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("🔄 ৫০+ চৰকাৰী ৱেবছাইটৰ পৰা নতুন আপডেট আনক (Scan Portals)", style = MaterialTheme.typography.labelSmall)
+                    Text("🔄 ৬০+ চৰকাৰী ৱেবছাইটৰ পৰা নতুন আপডেট আনক (Scan Portals)", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+
+        // 📰 DAILY TOP 10 BIG NEWS (দিনৰ শীৰ্ষ ১০ টা ডাঙৰ খবৰ)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("dashboard_top_10_daily_news_card"),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFFEF2F2)
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.PostAdd,
+                            contentDescription = null,
+                            tint = Color(0xFF991B1B),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "📰 দিনৰ শীৰ্ষ ১০ টা ডাঙৰ খবৰ",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF991B1B)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFFEE2E2)
+                    ) {
+                        Text(
+                            text = "TOP 10 NEWS",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF991B1B)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "১ টা আকৰ্ষণীয় পোষ্টত দিনটোৰ শীৰ্ষ ১০ টা ডাঙৰ চৰকাৰী জাননী, নিযুক্তি আৰু আঁচনি (GHC, SLPRB, APSC, DME, NSP আদি)। ১০০% অফিচিয়েল পৰ্টেলৰ পৰা প্ৰমাণিত।",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF7F1D1D)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.generateDailyTop10BigNewsPost {
+                                onNavigateToQueue()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_generate_daily_top_10"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF991B1B)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("শীৰ্ষ ১০ খবৰ বনাওক", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onNavigateToQueue,
+                        modifier = Modifier
+                            .weight(0.6f)
+                            .testTag("btn_view_top_10_queue"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("কিউ চাওক", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+
+        // 🔴 24x7 LIVE NEWS CHANNELS CARD (News Live, Pratidin Time, Prag News)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("dashboard_live_news_channels_card"),
+            colors = CardDefaults.cardColors(
+                containerColor = Color(0xFFEFF6FF)
+            ),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Public,
+                            contentDescription = null,
+                            tint = Color(0xFF1D4ED8),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🔴 লাইভ নিউজ চেনেল (আজিৰ সতেজ খবৰ)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E40AF)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFDBEAFE)
+                    ) {
+                        Text(
+                            text = "24x7 LIVE",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E40AF)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "News Live, Pratidin Time, Prag News আৰু The Assam Tribune-ৰ ৱেব ডেস্কৰ পৰা আজিৰ লাইভ খবৰ সংগ্ৰহ। পুৰণি নহয়, কেৱল আজিৰ লাইভ আপডেট!",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF1E3A8A)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Channel pills
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFBFDBFE), modifier = Modifier.weight(1f)) {
+                        Text(text = "News Live", modifier = Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF1E3A8A), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                    Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFBFDBFE), modifier = Modifier.weight(1f)) {
+                        Text(text = "Pratidin Time", modifier = Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF1E3A8A), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                    Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFBFDBFE), modifier = Modifier.weight(1f)) {
+                        Text(text = "Prag News", modifier = Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF1E3A8A), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                    Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFBFDBFE), modifier = Modifier.weight(1f)) {
+                        Text(text = "Tribune", modifier = Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF1E3A8A), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.generateLiveNewsChannelsPost {
+                            onNavigateToQueue()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_generate_live_news_channels"),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D4ED8)),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("🔴 চেনেলসমূহৰ লাইভ খবৰ পোষ্ট বনাওক (Generate Live News)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                 }
             }
         }

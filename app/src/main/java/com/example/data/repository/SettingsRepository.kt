@@ -64,6 +64,15 @@ class SettingsRepository(private val settingsDataStore: SettingsDataStore) {
         settingsDataStore.updateCustomGeminiApiKey(key)
     }
 
+    suspend fun updateDailyNotificationSettings(enabled: Boolean, hour: Int, minute: Int) {
+        settingsDataStore.updateDailyNotificationSettings(enabled, hour, minute)
+    }
+
+    suspend fun markDailyNotificationDelivered() {
+        val todayKey = getTodayDateKey()
+        settingsDataStore.markDailyNotificationDelivered(todayKey)
+    }
+
     private fun getTodayDateKey(): String {
         return try {
             val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)

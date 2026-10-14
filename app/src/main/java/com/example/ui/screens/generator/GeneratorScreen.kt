@@ -30,7 +30,12 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SentimentVerySatisfied
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Warning
+import com.example.domain.verification.SourceRiskLevel
+import com.example.domain.verification.SourceVerificationResult
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -113,6 +118,13 @@ fun GeneratorScreen(
     var selectedWebsiteCategory by remember { mutableStateOf("ALL") }
     var showAllWebsites by remember { mutableStateOf(false) }
     var showAddOpportunityDialog by remember { mutableStateOf(false) }
+
+    // Source Verification Service State (Google Search Grounding)
+    val verificationResult by viewModel.sourceVerificationResult.collectAsState()
+    val isVerifyingSource by viewModel.isVerifyingSource.collectAsState()
+    var verifyInputUrl by remember { mutableStateOf("") }
+    var verifyInputTitle by remember { mutableStateOf("") }
+    var verifyInputDeadline by remember { mutableStateOf("") }
 
     // Auto-select initial unposted / fresh 48h opportunity if none selected
     if (selectedOpportunity == null) {
@@ -323,6 +335,52 @@ fun GeneratorScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    Button(
+                        onClick = {
+                            viewModel.generateDailyTop10BigNewsPost {
+                                onNavigateToQueue()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF991B1B)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("btn_generate_top_10_daily_news_studio")
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "📰 GENERATE TOP 10 DAILY BIG NEWS POST (শীৰ্ষ ১০ ডাঙৰ খবৰ)",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            viewModel.generateLiveNewsChannelsPost {
+                                onNavigateToQueue()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D4ED8)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("btn_generate_live_news_channels_studio")
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🔴 LIVE NEWS CHANNELS POST (News Live, Pratidin, Prag)",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -428,6 +486,319 @@ fun GeneratorScreen(
                             modifier = Modifier.testTag("btn_batch_portals")
                         ) {
                             Text("🌐 All 100+ Websites", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 🛡️ SOURCE VERIFICATION SERVICE (GOOGLE SEARCH GROUNDING)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("source_verification_grounding_card"),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Verified,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🛡️ SOURCE VERIFICATION",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "SEARCH GROUNDING",
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "যিকোনো বাতৰি বা নিযুক্তিৰ লিংক Google Search Grounding ৰ দ্বাৰা অফিচিয়েল চৰকাৰী পৰ্টেল (.gov.in / ghconline / apsc) ৰ সৈতে ক্ৰছ-ৰেফাৰেন্স কৰক। পুৰণি তাৰিখ (Expired) বা ভুৱা জাননী প্ৰতিৰোধ কৰা হ'ব।",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = verifyInputUrl,
+                    onValueChange = { verifyInputUrl = it },
+                    label = { Text("News URL বা Website Link") },
+                    placeholder = { Text("https://ghconline.gov.in বা https://newslivetv.com") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_verify_url"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = verifyInputTitle,
+                    onValueChange = { verifyInputTitle = it },
+                    label = { Text("বাতৰিৰ শিৰোনাম / পদৰ নাম (Headline / Role)") },
+                    placeholder = { Text("e.g. Gauhati High Court LDA / Stenographer Recruitment") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_verify_title"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = verifyInputDeadline,
+                    onValueChange = { verifyInputDeadline = it },
+                    label = { Text("অন্তিম তাৰিখ / Deadline (পৰীক্ষাৰ বাবে)") },
+                    placeholder = { Text("e.g. 10 February 2026") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_verify_deadline"),
+                    singleLine = true,
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Quick test suggestions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                verifyInputUrl = "https://ghconline.gov.in/Recruitment.html"
+                                verifyInputTitle = "Gauhati High Court Official Recruitment"
+                                verifyInputDeadline = ""
+                            }
+                    ) {
+                        Text(
+                            text = "🏛️ Gauhati High Court",
+                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 6.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                verifyInputUrl = "https://slprbassam.in"
+                                verifyInputTitle = "Assam Police SLPRB 6000+ Recruitment"
+                                verifyInputDeadline = ""
+                            }
+                    ) {
+                        Text(
+                            text = "👮 SLPRB Assam Police",
+                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 6.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                verifyInputUrl = "https://newslivetv.com"
+                                verifyInputTitle = "News Live Assam Breaking Report"
+                                verifyInputDeadline = ""
+                            }
+                    ) {
+                        Text(
+                            text = "🔴 News Live",
+                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 6.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.verifySourceUrl(
+                            url = verifyInputUrl,
+                            title = verifyInputTitle,
+                            sourceName = "Query Source",
+                            deadline = verifyInputDeadline.takeIf { it.isNotBlank() }
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("btn_run_source_verification"),
+                    shape = RoundedCornerShape(10.dp),
+                    enabled = !isVerifyingSource
+                ) {
+                    if (isVerifyingSource) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Google Search Grounding চলি আছে...")
+                    } else {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("🔍 পৰীক্ষা কৰক (Verify with Google Search Grounding)", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                verificationResult?.let { res ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = when (res.riskLevel) {
+                            SourceRiskLevel.SAFE_OFFICIAL -> Color(0xFFF0FDF4)
+                            SourceRiskLevel.CROSS_REFERENCED_NEWS -> Color(0xFFEFF6FF)
+                            SourceRiskLevel.UNCONFIRMED_SECONDARY -> Color(0xFFFEFCE8)
+                            SourceRiskLevel.SUSPICIOUS_OR_EXPIRED -> Color(0xFFFEF2F2)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = if (res.riskLevel == SourceRiskLevel.SUSPICIOUS_OR_EXPIRED) Icons.Default.Warning else Icons.Default.Verified,
+                                        contentDescription = null,
+                                        tint = when (res.riskLevel) {
+                                            SourceRiskLevel.SAFE_OFFICIAL -> Color(0xFF16A34A)
+                                            SourceRiskLevel.CROSS_REFERENCED_NEWS -> Color(0xFF2563EB)
+                                            SourceRiskLevel.UNCONFIRMED_SECONDARY -> Color(0xFFD97706)
+                                            SourceRiskLevel.SUSPICIOUS_OR_EXPIRED -> Color(0xFFDC2626)
+                                        },
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = res.riskLevel.displayName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when (res.riskLevel) {
+                                            SourceRiskLevel.SAFE_OFFICIAL -> Color(0xFF15803D)
+                                            SourceRiskLevel.CROSS_REFERENCED_NEWS -> Color(0xFF1D4ED8)
+                                            SourceRiskLevel.UNCONFIRMED_SECONDARY -> Color(0xFFB45309)
+                                            SourceRiskLevel.SUSPICIOUS_OR_EXPIRED -> Color(0xFFB91C1C)
+                                        }
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color.White.copy(alpha = 0.8f)
+                                ) {
+                                    Text(
+                                        text = "${(res.confidenceScore * 100).toInt()}% Confidence",
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = res.verificationSummary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF1F2937)
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = "🏛️ Canonical Official Portal: ${res.canonicalOfficialUrl}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E40AF)
+                            )
+
+                            if (res.groundedWebSources.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "🌐 Grounded Web Sources (${res.groundedWebSources.size} verified):",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                res.groundedWebSources.take(3).forEach { src ->
+                                    Text(
+                                        text = "• ${src.title}: ${src.url}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF4B5563),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            if (res.riskLevel != SourceRiskLevel.SUSPICIOUS_OR_EXPIRED) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        viewModel.addCustomOpportunity(
+                                            title = if (verifyInputTitle.isNotBlank()) verifyInputTitle else "Verified: ${res.officialAuthority ?: res.primaryDomain}",
+                                            description = res.verificationSummary,
+                                            category = OpportunityCategory.GOVERNMENT_JOB.name,
+                                            region = OpportunityRegion.ASSAM.name,
+                                            organization = res.officialAuthority ?: res.primaryDomain,
+                                            eligibility = "অফিচিয়েল বিজ্ঞাপন অনুসৰি পৰীক্ষা কৰক",
+                                            sourceUrl = res.canonicalOfficialUrl,
+                                            deadline = verifyInputDeadline.takeIf { it.isNotBlank() } ?: "অফিচিয়েল বিজ্ঞাপন চাওক",
+                                            onComplete = { oppEntity ->
+                                                selectedOpportunity = oppEntity
+                                            }
+                                        )
+                                        viewModel.showMessage("✅ প্ৰমাণিত চৰকাৰী জাননী Generator ত নিৰ্বাচন কৰা হ'ল!")
+                                    },
+                                    modifier = Modifier.fillMaxWidth().testTag("btn_use_verified_source"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF15803D))
+                                ) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("এই প্ৰমাণিত জাননীৰে পোষ্ট বনাওক (Use Verified Source)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
                         }
                     }
                 }

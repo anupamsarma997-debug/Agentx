@@ -503,6 +503,153 @@ open class GeminiClient(
     }
 
     /**
+     * Executes Google Search Grounding to verify content and URLs with live web and official government domains.
+     * Extracts model generated response along with grounding chunks (URLs, titles).
+     */
+    suspend fun executeSearchGrounding(
+        prompt: String,
+        systemInstruction: String = "You are an official Indian government and primary source verification system.",
+        model: String = "gemini-3.5-flash"
+    ): GroundedSearchResult = withContext(Dispatchers.IO) {
+        val apiKey = apiKeyProvider()
+        if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY" || apiKey.startsWith("YOUR_")) {
+            return@withContext GroundedSearchResult(
+                isSuccess = false,
+                text = "",
+                errorMessage = "Gemini API key is not configured."
+            )
+        }
+
+        var connection: HttpURLConnection? = null
+        try {
+            val endpointUrl = "$BASE_URL/$model:generateContent?key=$apiKey"
+            val url = URL(endpointUrl)
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 20000
+                readTimeout = 40000
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                setRequestProperty("User-Agent", "SocialAgent-Android/1.0")
+            }
+
+            val requestJson = JSONObject().apply {
+                put("contents", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("parts", JSONArray().apply {
+                            put(JSONObject().put("text", prompt))
+                        })
+                    })
+                })
+                if (systemInstruction.isNotBlank()) {
+                    put("systemInstruction", JSONObject().apply {
+                        put("parts", JSONArray().apply {
+                            put(JSONObject().put("text", systemInstruction))
+                        })
+                    })
+                }
+                // Google Search Grounding tool
+                put("tools", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("googleSearch", JSONObject())
+                    })
+                })
+                put("generationConfig", JSONObject().apply {
+                    put("temperature", 0.1) // Low temperature for factual precision
+                    put("maxOutputTokens", 2048)
+                })
+            }
+
+            OutputStreamWriter(connection.outputStream).use { writer ->
+                writer.write(requestJson.toString())
+                writer.flush()
+            }
+
+            val responseCode = connection.responseCode
+            val responseStream = if (responseCode in 200..299) {
+                connection.inputStream
+            } else {
+                connection.errorStream ?: connection.inputStream
+            }
+
+            val responseText = responseStream?.let { stream ->
+                BufferedReader(InputStreamReader(stream)).use { it.readText() }
+            } ?: ""
+
+            if (responseCode !in 200..299) {
+                val safeErr = extractSafeErrorMessage(responseCode, responseText, apiKey)
+                return@withContext GroundedSearchResult(
+                    isSuccess = false,
+                    text = "",
+                    errorMessage = safeErr
+                )
+            }
+
+            val root = JSONObject(responseText)
+            val candidates = root.optJSONArray("candidates")
+            if (candidates == null || candidates.length() == 0) {
+                return@withContext GroundedSearchResult(
+                    isSuccess = false,
+                    text = "",
+                    errorMessage = "No response candidates returned."
+                )
+            }
+
+            val firstCandidate = candidates.getJSONObject(0)
+            val content = firstCandidate.optJSONObject("content")
+            val parts = content?.optJSONArray("parts")
+            val textBuilder = StringBuilder()
+            if (parts != null) {
+                for (i in 0 until parts.length()) {
+                    val p = parts.getJSONObject(i)
+                    val t = p.optString("text")
+                    if (t.isNotBlank()) {
+                        textBuilder.append(t)
+                    }
+                }
+            }
+
+            val responseBody = textBuilder.toString()
+
+            // Extract Google Search Grounding Metadata
+            val groundingSources = mutableListOf<GroundingWebSource>()
+            val groundingMetadata = firstCandidate.optJSONObject("groundingMetadata")
+            if (groundingMetadata != null) {
+                val groundingChunks = groundingMetadata.optJSONArray("groundingChunks")
+                if (groundingChunks != null) {
+                    for (i in 0 until groundingChunks.length()) {
+                        val chunk = groundingChunks.optJSONObject(i)
+                        val web = chunk?.optJSONObject("web")
+                        if (web != null) {
+                            val uri = web.optString("uri")
+                            val title = web.optString("title").ifBlank { uri }
+                            if (uri.isNotBlank()) {
+                                groundingSources.add(GroundingWebSource(title = title, url = uri))
+                            }
+                        }
+                    }
+                }
+            }
+
+            GroundedSearchResult(
+                isSuccess = true,
+                text = responseBody,
+                groundingSources = groundingSources.distinctBy { it.url }
+            )
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            val sanitized = sanitizeExceptionMessage(e.localizedMessage ?: "Unknown error", apiKey)
+            GroundedSearchResult(
+                isSuccess = false,
+                text = "",
+                errorMessage = sanitized
+            )
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    /**
      * Creates an image from a text prompt using gemini-3.1-flash-image-preview.
      * Supports aspect ratios: 1:1, 4:5, 16:9, 9:16.
      */
